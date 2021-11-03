@@ -14,31 +14,33 @@ class FixedDataRegistrar:
 
     def __init__(self):
         self._store = defaultdict(list)
+        self._id_counter = 0
 
-    def get_by_name(self, object_type: NameableType, item_name: str):
+    def get_fixed_data(self, object_type: NameableType, item_reference: any):
         search_list = self._store[object_type]
+        lookup = "name" if isinstance(item_reference, str) else "unique_id"
         for test_item in search_list:
-            if test_item == item_name:
+            if getattr(test_item, lookup) == item_reference:
                 return test_item
-        raise ValueError(f"No {object_type} found with name {item_name}")
-
-    def get_from_names(self, fd_type: NameableType, names):
-        fixed_data_items = []
-        for name in names:
-            fixed_data = self.get_by_name(fd_type, name)
-            fixed_data_items.append(fixed_data)
-        return fixed_data_items
+        raise ValueError(f"No {object_type} found with reference {item_reference}")
 
     def create_player(self, name: str):
-        new_player = Player(name)
+        new_player = Player(self._id_counter, name)
         self._store[NameableType.PLAYER].append(new_player)
+        self._id_counter += 1
         return new_player
 
     def create_team(self, name: str, line_up: list[Player]):
-        new_team = Team(name, line_up)
+        new_team = Team(self._id_counter, name, line_up)
         self._store[NameableType.TEAM].append(new_team)
+        self._id_counter += 1
         return new_team
 
-    def get_players(self):
-        return self._store[NameableType.PLAYER]
+    def get_all_of_type(self, fd_type: NameableType):
+        return self._store[fd_type]
 
+    def get_from_names(self, fd_type: NameableType, names: list[str]):
+        fixed_data_items = []
+        for name in names:
+            fixed_data_items.append(self.get_fixed_data(fd_type, name))
+        return fixed_data_items

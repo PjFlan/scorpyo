@@ -1,10 +1,10 @@
-from util import Nameable
+from util import FixedData
 
 
-class Player(Nameable):
+class Player(FixedData):
 
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, unique_id: int, name: str):
+        super().__init__(unique_id, name)
 
     def get_scorecard_name(self):
         name_parts = self.name.split(" ")
