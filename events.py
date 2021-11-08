@@ -87,12 +87,15 @@ class BallCompletedEvent:
     @classmethod
     def build(cls, payload: dict, current_innings: Innings):
         ball_score = Score.parse(payload["score_text"])
-        prev_ball_event = current_innings.get_previous_ball()
-        ball_increment = 1 if ball_score.is_valid_delivery() else 0
-        ball_in_over_number = prev_ball_event.ball_in_over_number + ball_increment
-        ball_in_innings_number = prev_ball_event.ball_in_innings_number + ball_increment
-        striker = current_innings.on_strike
-        non_striker = current_innings.off_strike
+        prev_ball = current_innings.get_previous_ball()
+        if not prev_ball:
+            ball_in_over_number, ball_in_innings_number = 0, 0
+        else:
+            ball_increment = 1 if ball_score.is_valid_delivery() else 0
+            ball_in_over_number = prev_ball.ball_in_over_number + ball_increment
+            ball_in_innings_number = prev_ball.ball_in_innings_number + ball_increment
+        striker = current_innings.get_striker()
+        non_striker = current_innings.get_non_striker()
         bowler = current_innings.get_current_bowler()
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:

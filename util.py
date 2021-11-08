@@ -1,4 +1,4 @@
-from score import BLANK_SCORE
+import score
 
 
 class FixedData:
@@ -23,14 +23,19 @@ class Scoreable:
 
     def __init__(self):
         self._ball_events = []
-        self._score = BLANK_SCORE
+        self._score = score.Score(0, 0, 0, 0, 0, 0, 0)
 
     def on_ball_completed(self, ball_completed_event):
         self._ball_events.append(ball_completed_event)
         self._score.add(ball_completed_event.ball_score)
 
     def get_previous_ball(self):
+        if len(self._ball_events) == 0:
+            return None
         return self._ball_events[-1]
+
+    def runs_scored(self):
+        return self._score.runs_off_bat
 
 
 def switch_strike(striker, non_striker):

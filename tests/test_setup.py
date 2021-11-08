@@ -3,6 +3,7 @@ import itertools
 import pytest
 
 import match_type
+from events import BallCompletedEvent
 from match import Match
 from registrar import FixedDataRegistrar, NameableType
 from mux import MatchMux
@@ -40,6 +41,18 @@ def registrar():
 @pytest.fixture()
 def mux(registrar):
     return MatchMux(registrar)
+
+
+@pytest.fixture()
+def mock_innings(registrar):
+    mock_match = MockMatch()
+    teams = registrar.get_all_of_type(NameableType.TEAM)
+    mock_match.home_team = teams[0]
+    mock_match.away_team = teams[1]
+    bowler_name = test_players_away[-1]
+    payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
+    mock_match.on_new_innings(payload, registrar)
+    return mock_match.get_current_innings()
 
 
 def test_registrar():
@@ -86,3 +99,15 @@ def test_new_innings(mux, registrar):
     current_innings = mock_match.get_current_innings()
     assert current_innings.innings_id == 0
     assert current_innings.get_current_over().over_number == 0
+
+
+def test_ball_completed(mux, registrar, mock_innings):
+    payload = {"score_text": "1"}
+    assert mock_innings.get_striker() == test_players_home[0]
+    event = BallCompletedEvent.build(payload, mock_innings)
+    assert event.players_crossed
+    assert event.ball_score.runs_off_bat == 1
+    mock_innings.on_ball_completed(event)
+    assert mock_innings.get_striker() == test_players_home[1]
+    assert mock_innings.off_strike_innings.runs_scored() == 1
+
