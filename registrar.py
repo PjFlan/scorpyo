@@ -44,3 +44,12 @@ class FixedDataRegistrar:
         for name in names:
             fixed_data_items.append(self.get_fixed_data(fd_type, name))
         return fixed_data_items
+
+
+class EventRegistrar:
+
+    def __init__(self):
+        self._events = []
+
+    def add(self, event):
+        self._events.append(event)

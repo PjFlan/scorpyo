@@ -1,11 +1,12 @@
-from events import InningsStartedEvent
 from over import Over
 from player import Player
+import util
 
 
-class Innings:
+class Innings(util.Scoreable):
 
-    def __init__(self, innings_started_event: InningsStartedEvent):
+    def __init__(self, innings_started_event):
+        super().__init__()
         self.start_time = innings_started_event.start_time
         self.innings_id = innings_started_event.innings_id
         self.batting_team = innings_started_event.batting_team
@@ -24,18 +25,46 @@ class Innings:
     def get_current_over(self):
         return self.overs[-1]
 
+    def get_striker(self):
+        return self.on_strike.player
 
-class BattingInnings:
+    def get_non_striker(self):
+        return self.off_strike.player
+
+    def get_current_bowler(self):
+        return self.get_current_over().bowler
+
+    def on_ball_completed(self, ball_completed_event):
+        super().on_ball_completed(ball_completed_event)
+        if ball_completed_event.players_crossed:
+            self.on_strike, self.off_strike = util.switch_strike(self.on_strike,
+                                                                 self.off_strike)
+        self.on_strike.on_ball_completed(ball_completed_event)
+        self.off_strike.on_ball_completed(ball_completed_event)
+        self.get_current_bowler().on_ball_completed(ball_completed_event)
+        self.get_current_over().on_ball_completed(ball_completed_event)
+
+
+class BattingInnings(util.Scoreable):
 
     def __init__(self, player: Player):
+        super().__init__()
         self.player = player
         self.balls = []
         self.dismissal = None
 
+    def on_ball_completed(self, ball_completed_event):
+        if ball_completed_event.on_strike == self.player:
+            super().on_ball_completed(ball_completed_event)
 
-class BowlingInnings:
+
+class BowlingInnings(util.Scoreable):
 
     def __init__(self, player: Player, first_over: Over):
+        super().__init__()
         self.player = player
         self.overs = [first_over]
         self.balls = []
+
+    def on_ball_completed(self, ball_completed_event):
+        super().on_ball_completed(ball_completed_event)
