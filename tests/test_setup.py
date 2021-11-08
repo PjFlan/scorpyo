@@ -6,7 +6,6 @@ import match_type
 from match import Match
 from registrar import FixedDataRegistrar, NameableType
 from mux import MatchMux
-import score
 
 
 test_players_home = ["Padraic Flanagan", "Jack Tector", "Harry Tector", "Bobby Gamble"]
@@ -87,35 +86,3 @@ def test_new_innings(mux, registrar):
     current_innings = mock_match.get_current_innings()
     assert current_innings.innings_id == 0
     assert current_innings.get_current_over().over_number == 0
-
-
-def scores_match(score_one, score_two):
-    if score_one.runs_off_bat != score_two.runs_off_bat:
-        return False
-    if score_one.wide_runs != score_two.wide_runs:
-        return False
-    if score_one.wide_deliveries != score_two.wide_deliveries:
-        return False
-    if score_one.valid_deliveries != score_two.valid_deliveries:
-        return False
-    if score_one.leg_byes != score_two.leg_byes:
-        return False
-    if score_one.byes != score_two.byes:
-        return False
-    if score_one.no_ball_runs != score_two.no_ball_runs:
-        return False
-    if score_one.penalty_runs != score_two.penalty_runs:
-        return False
-    if score_one.wickets != score_two.wickets:
-        return False
-    return True
-
-
-@pytest.mark.parametrize("test_input,expected",
-                         [(".", score.DOT_BALL),
-                          ("w", score.WIDE_BALL),
-                          ("W", score.WICKET_BALL),
-                          ("1", score.Score(1, 0, 0, 0, 0, 0, 0)),
-                          ("4lb", score.Score(0, 0, 4, 0, 0, 0, 0))])
-def test_score_parser(test_input, expected):
-    assert scores_match(score.Score.parse(test_input), expected)

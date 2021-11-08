@@ -65,13 +65,21 @@ class Score:
         self.wide_deliveries += new_score.wide_deliveries
         self.valid_deliveries += new_score.valid_deliveries
         self.leg_byes += new_score.leg_byes
-        self.byes += new_score.leg_byes
+        self.byes += new_score.byes
         self.no_ball_runs += new_score.no_ball_runs
         self.penalty_runs += new_score.penalty_runs
         self.wickets += new_score.wickets
+        return self
 
     def get_ran_runs(self):
         return self.runs_off_bat + self.byes + self.leg_byes
+
+    def get_total_runs(self):
+        return self.runs_off_bat + self.wide_runs + self.leg_byes + self.byes + \
+               self.penalty_runs + self.no_ball_runs
+
+    def get_extra_runs(self):
+        return self.leg_byes + self.byes + self.wide_runs + self.no_ball_runs
 
 
 BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)
