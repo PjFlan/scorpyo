@@ -25,12 +25,16 @@ def scores_equal(score_one, score_two):
     return True
 
 
-@pytest.mark.parametrize("test_input,expected",
-                         [(".", score.DOT_BALL),
-                          ("w", score.WIDE_BALL),
-                          ("W", score.WICKET_BALL),
-                          ("1", score.Score(1, 0, 0, 0, 0, 0, 0)),
-                          ("4lb", score.Score(0, 0, 4, 0, 0, 0, 0))])
+@pytest.mark.parametrize(
+    "test_input,expected",
+    [
+        (".", score.DOT_BALL),
+        ("w", score.WIDE_BALL),
+        ("W", score.WICKET_BALL),
+        ("1", score.Score(1, 0, 0, 0, 0, 0, 0)),
+        ("4lb", score.Score(0, 0, 4, 0, 0, 0, 0)),
+    ],
+)
 def test_score_parser(test_input, expected):
     assert scores_equal(score.Score.parse(test_input), expected)
 

@@ -5,7 +5,6 @@ from util import Scoreable
 
 
 class Match(Scoreable):
-
     def __init__(self, match_started_event):
         super().__init__()
         self.match_id = match_started_event.match_id

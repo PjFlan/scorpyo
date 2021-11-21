@@ -4,7 +4,6 @@ import util
 
 
 class Innings(util.Scoreable):
-
     def __init__(self, innings_started_event):
         super().__init__()
         self.start_time = innings_started_event.start_time
@@ -38,17 +37,18 @@ class Innings(util.Scoreable):
         super().on_ball_completed(ball_completed_event)
         self.on_strike_innings.on_ball_completed(ball_completed_event)
         self.off_strike_innings.on_ball_completed(ball_completed_event)
-        bowler_innings = find_innings(self.get_current_bowler(), self.bowler_inningses)
+        bowler_innings = find_player_innings(
+            self.get_current_bowler(), self.bowler_inningses
+        )
         bowler_innings.on_ball_completed(ball_completed_event)
         self.get_current_over().on_ball_completed(ball_completed_event)
         if ball_completed_event.players_crossed:
             self.on_strike_innings, self.off_strike_innings = util.switch_strike(
-                                                                self.on_strike_innings,
-                                                                self.off_strike_innings)
+                self.on_strike_innings, self.off_strike_innings
+            )
 
 
 class BattingInnings(util.Scoreable):
-
     def __init__(self, player: Player):
         super().__init__()
         self.player = player
@@ -61,7 +61,6 @@ class BattingInnings(util.Scoreable):
 
 
 class BowlingInnings(util.Scoreable):
-
     def __init__(self, player: Player, first_over: Over):
         super().__init__()
         self.player = player
@@ -72,7 +71,7 @@ class BowlingInnings(util.Scoreable):
         super().on_ball_completed(ball_completed_event)
 
 
-def find_innings(player: Player, inningses: list):
+def find_player_innings(player: Player, inningses: list):
     for innings in inningses:
         if innings.player == player:
             return innings

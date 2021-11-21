@@ -5,8 +5,16 @@ class Score:
 
     SCORE_PATTERN = re.compile("(?P<num>[0-9]+)?(?P<mod>[a-zA-Z]+)?")
 
-    def __init__(self, runs_off_bat, wide_runs, leg_byes, byes, no_ball_runs,
-                 penalty_runs, wickets):
+    def __init__(
+        self,
+        runs_off_bat,
+        wide_runs,
+        leg_byes,
+        byes,
+        no_ball_runs,
+        penalty_runs,
+        wickets,
+    ):
         self.runs_off_bat = runs_off_bat
         self.wide_runs = wide_runs
         self.leg_byes = leg_byes
@@ -75,8 +83,14 @@ class Score:
         return self.runs_off_bat + self.byes + self.leg_byes
 
     def get_total_runs(self):
-        return self.runs_off_bat + self.wide_runs + self.leg_byes + self.byes + \
-               self.penalty_runs + self.no_ball_runs
+        return (
+            self.runs_off_bat
+            + self.wide_runs
+            + self.leg_byes
+            + self.byes
+            + self.penalty_runs
+            + self.no_ball_runs
+        )
 
     def get_extra_runs(self):
         return self.leg_byes + self.byes + self.wide_runs + self.no_ball_runs

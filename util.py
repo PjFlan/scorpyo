@@ -20,7 +20,6 @@ class FixedData:
 
 
 class Scoreable:
-
     def __init__(self):
         self._ball_events = []
         self._score = score.Score(0, 0, 0, 0, 0, 0, 0)

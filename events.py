@@ -21,14 +21,14 @@ class EventType(Enum):
 
 
 class MatchStartedEvent:
-
-    def __init__(self,
-                 match_id: int,
-                 match_type: MatchType,
-                 start_time: float,
-                 home_team: Team,
-                 away_team: Team,
-                 ):
+    def __init__(
+        self,
+        match_id: int,
+        match_type: MatchType,
+        start_time: float,
+        home_team: Team,
+        away_team: Team,
+    ):
         self.match_id = match_id
         self.match_type = match_type
         self.start_time = start_time
@@ -43,17 +43,24 @@ class MatchStartedEvent:
         match_id = int(start_time)
         home_team = registrar.get_fixed_data(NameableType.TEAM, payload["home_team"])
         away_team = registrar.get_fixed_data(NameableType.TEAM, payload["away_team"])
-        home_team.add_line_up(registrar.get_from_names(NameableType.PLAYER,
-                                                       payload["home_line_up"]))
-        away_team.add_line_up(registrar.get_from_names(NameableType.PLAYER,
-                                                       payload["away_line_up"]))
+        home_team.add_line_up(
+            registrar.get_from_names(NameableType.PLAYER, payload["home_line_up"])
+        )
+        away_team.add_line_up(
+            registrar.get_from_names(NameableType.PLAYER, payload["away_line_up"])
+        )
         return cls(match_id, match_type, start_time, home_team, away_team)
 
 
 class InningsStartedEvent:
-
-    def __init__(self, innings_id: int, start_time: float, batting_team: Team,
-                 bowling_team: Team, opening_bowler: Player):
+    def __init__(
+        self,
+        innings_id: int,
+        start_time: float,
+        batting_team: Team,
+        bowling_team: Team,
+        opening_bowler: Player,
+    ):
         self.innings_id = innings_id
         self.start_time = start_time
         self.batting_team = batting_team
@@ -64,18 +71,27 @@ class InningsStartedEvent:
     def build(cls, payload: dict, registrar: FixedDataRegistrar, match):
         start_time = get_current_time()
         innings_id = match.get_num_innings()  # index innings from 0 not 1
-        batting_team = registrar.get_fixed_data(NameableType.TEAM,
-                                                payload["batting_team"])
+        batting_team = registrar.get_fixed_data(
+            NameableType.TEAM, payload["batting_team"]
+        )
         bowling_team = [team for team in match.get_teams() if team != batting_team][0]
-        opening_bowler = registrar.get_fixed_data(NameableType.PLAYER,
-                                                  payload["opening_bowler"])
+        opening_bowler = registrar.get_fixed_data(
+            NameableType.PLAYER, payload["opening_bowler"]
+        )
         return cls(innings_id, start_time, batting_team, bowling_team, opening_bowler)
 
 
 class BallCompletedEvent:
-
-    def __init__(self, on_strike, off_strike, bowler, ball_score, ball_in_over_number,
-                 ball_in_innings_number, players_crossed):
+    def __init__(
+        self,
+        on_strike,
+        off_strike,
+        bowler,
+        ball_score,
+        ball_in_over_number,
+        ball_in_innings_number,
+        players_crossed,
+    ):
         self.on_strike = on_strike
         self.off_strike = off_strike
         self.bowler = bowler
@@ -102,13 +118,15 @@ class BallCompletedEvent:
             players_crossed = True
         elif ball_score.get_ran_runs() % 2 == 1:
             players_crossed = True
-        ball_completed_event = BallCompletedEvent(striker,
-                                                  non_striker,
-                                                  bowler,
-                                                  ball_score,
-                                                  ball_in_over_number,
-                                                  ball_in_innings_number,
-                                                  players_crossed)
+        ball_completed_event = BallCompletedEvent(
+            striker,
+            non_striker,
+            bowler,
+            ball_score,
+            ball_in_over_number,
+            ball_in_innings_number,
+            players_crossed,
+        )
         return ball_completed_event
 
 

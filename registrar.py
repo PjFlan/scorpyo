@@ -11,7 +11,6 @@ class NameableType(Enum):
 
 
 class FixedDataRegistrar:
-
     def __init__(self):
         self._store = defaultdict(list)
         self._id_counter = 0
@@ -47,7 +46,6 @@ class FixedDataRegistrar:
 
 
 class EventRegistrar:
-
     def __init__(self):
         self._events = []
 

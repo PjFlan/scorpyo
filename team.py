@@ -3,7 +3,6 @@ from util import FixedData
 
 
 class Team(FixedData):
-
     def __init__(self, unique_id: int, name: str, line_up: list[Player]):
         super().__init__(unique_id, name)
         self._line_up = line_up

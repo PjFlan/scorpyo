@@ -1,63 +1,14 @@
 import itertools
 
-import pytest
-
-import match_type
-from events import BallCompletedEvent
-from match import Match
 from registrar import FixedDataRegistrar, NameableType
-from mux import MatchMux
-
-
-test_players_home = ["Padraic Flanagan", "Jack Tector", "Harry Tector", "Bobby Gamble"]
-test_players_away = ["JJ Cassidy", "Callum Donnelly", "Tim Tector", "Oliver Gunning"]
-test_team_home = "YMCA CC"
-test_team_away = "Pembroke CC"
-
-
-# noinspection PyMissingConstructor
-class MockMatch(Match):
-
-    def __init__(self):
-        self.match_id = 12345
-        self.match_inningses = []
-        self.match_type = match_type.TWENTY_20
-
-
-@pytest.fixture()
-def registrar():
-    registrar = FixedDataRegistrar()
-    line_up_home = []
-    line_up_away = []
-    for name in test_players_home:
-        line_up_home.append(registrar.create_player(name))
-    for name in test_players_away:
-        line_up_away.append(registrar.create_player(name))
-    registrar.create_team(test_team_home, line_up_home)
-    registrar.create_team(test_team_away, line_up_away)
-    return registrar
-
-
-@pytest.fixture()
-def mux(registrar):
-    return MatchMux(registrar)
-
-
-@pytest.fixture()
-def mock_innings(registrar):
-    mock_match = MockMatch()
-    teams = registrar.get_all_of_type(NameableType.TEAM)
-    mock_match.home_team = teams[0]
-    mock_match.away_team = teams[1]
-    bowler_name = test_players_away[-1]
-    payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
-    mock_match.on_new_innings(payload, registrar)
-    return mock_match.get_current_innings()
+from static_data import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 def test_registrar():
-    registrar = FixedDataRegistrar()
-    test_names = test_players_home
+    registrar = FixedDataRegistrar(
+    )
+    test_names = HOME_PLAYERS
+    test_team_home = HOME_TEAM
     line_up = []
     for name in test_names:
         line_up.append(registrar.create_player(name))
@@ -76,38 +27,27 @@ def test_unique_id(registrar):
 
 
 def test_new_match(mux, registrar):
-    test_payload = {"match_type": "T",
-                    "home_team": test_team_home,
-                    "away_team": test_team_away,
-                    "home_line_up": test_players_home,
-                    "away_line_up": test_players_away}
+    test_payload = {
+        "match_type": "T",
+        "home_team": HOME_TEAM,
+        "away_team": AWAY_TEAM,
+        "home_line_up": HOME_PLAYERS,
+        "away_line_up": AWAY_PLAYERS,
+    }
     new_match_message = {"event_type": 0, "payload": test_payload}
     mux.on_event(new_match_message)
     assert mux.current_match.get_max_overs() == 20
-    assert mux.current_match.home_team.name == test_team_home
+    assert mux.current_match.home_team.name == HOME_TEAM
 
 
-def test_new_innings(mux, registrar):
-    mock_match = MockMatch()
+def test_new_innings(mux, registrar, mock_match):
     teams = registrar.get_all_of_type(NameableType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
-    bowler_name = test_players_away[-1]
-    payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
+    bowler_name = AWAY_PLAYERS[-1]
+    payload = {"batting_team": HOME_TEAM, "opening_bowler": bowler_name}
     mock_match.on_new_innings(payload, registrar)
     assert mock_match.get_num_innings() == 1
     current_innings = mock_match.get_current_innings()
     assert current_innings.innings_id == 0
     assert current_innings.get_current_over().over_number == 0
-
-
-def test_ball_completed(mux, registrar, mock_innings):
-    payload = {"score_text": "1"}
-    assert mock_innings.get_striker() == test_players_home[0]
-    event = BallCompletedEvent.build(payload, mock_innings)
-    assert event.players_crossed
-    assert event.ball_score.runs_off_bat == 1
-    mock_innings.on_ball_completed(event)
-    assert mock_innings.get_striker() == test_players_home[1]
-    assert mock_innings.off_strike_innings.runs_scored() == 1
-

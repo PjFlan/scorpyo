@@ -4,7 +4,6 @@ from registrar import EventRegistrar, FixedDataRegistrar
 
 
 class MatchMux:
-
     def __init__(self, fd_registrar: FixedDataRegistrar):
         self.current_match = None
         self._fd_registrar = fd_registrar
