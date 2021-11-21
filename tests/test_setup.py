@@ -5,8 +5,7 @@ from static_data import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 def test_registrar():
-    registrar = FixedDataRegistrar(
-    )
+    registrar = FixedDataRegistrar()
     test_names = HOME_PLAYERS
     test_team_home = HOME_TEAM
     line_up = []
