@@ -1,7 +1,6 @@
 import time
 from enum import Enum
 
-from innings import Innings
 from match_type import MatchType, get_match_type
 from player import Player
 from score import Score
@@ -88,31 +87,31 @@ class BallCompletedEvent:
         off_strike,
         bowler,
         ball_score,
-        ball_in_over_number,
-        ball_in_innings_number,
         players_crossed,
     ):
         self.on_strike = on_strike
         self.off_strike = off_strike
         self.bowler = bowler
         self.ball_score = ball_score
-        self.ball_in_over_number = ball_in_over_number
-        self.ball_in_innings_number = ball_in_innings_number
         self.players_crossed = players_crossed
 
     @classmethod
-    def build(cls, payload: dict, current_innings: Innings):
+    def build(cls, payload: dict, registrar: FixedDataRegistrar):
         ball_score = Score.parse(payload["score_text"])
-        prev_ball = current_innings.get_previous_ball()
-        if not prev_ball:
-            ball_in_over_number, ball_in_innings_number = 0, 0
-        else:
-            ball_increment = 1 if ball_score.is_valid_delivery() else 0
-            ball_in_over_number = prev_ball.ball_in_over_number + ball_increment
-            ball_in_innings_number = prev_ball.ball_in_innings_number + ball_increment
-        striker = current_innings.get_striker()
-        non_striker = current_innings.get_non_striker()
-        bowler = current_innings.get_current_bowler()
+        striker = non_striker = bowler = None
+        for key in payload:
+            if key == "on_strike":
+                striker = registrar.get_fixed_data(
+                    NameableType.PLAYER, payload["on_strike"]
+                )
+            elif key == "off_strike":
+                non_striker = registrar.get_fixed_data(
+                    NameableType.PLAYER, payload["off_strike"]
+                )
+            elif key == "bowler":
+                bowler = registrar.get_fixed_data(
+                    NameableType.PLAYER, payload["bowler"]
+                )
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
             players_crossed = True
@@ -123,8 +122,6 @@ class BallCompletedEvent:
             non_striker,
             bowler,
             ball_score,
-            ball_in_over_number,
-            ball_in_innings_number,
             players_crossed,
         )
         return ball_completed_event

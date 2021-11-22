@@ -31,8 +31,8 @@ def scores_equal(score_one, score_two):
         (".", score.DOT_BALL),
         ("w", score.WIDE_BALL),
         ("W", score.WICKET_BALL),
-        ("1", score.Score(1, 0, 0, 0, 0, 0, 0)),
-        ("4lb", score.Score(0, 0, 4, 0, 0, 0, 0)),
+        ("1", score.Score.from_tuple(1, 0, 0, 0, 0, 0, 0)),
+        ("4lb", score.Score.from_tuple(0, 0, 4, 0, 0, 0, 0)),
     ],
 )
 def test_score_parser(test_input, expected):
@@ -40,13 +40,19 @@ def test_score_parser(test_input, expected):
 
 
 def test_add_score():
-    score_one = score.Score(4, 0, 0, 0, 0, 0, 0)
-    score_two = score.Score(0, 2, 0, 0, 0, 0, 0)
-    score_three = score.Score(0, 0, 2, 0, 0, 0, 0)
-    score_four = score.Score(0, 0, 0, 0, 1, 0, 0)
+    score_one = score.Score.from_tuple(4, 0, 0, 0, 0, 0, 0)
+    score_two = score.Score.from_tuple(0, 2, 0, 0, 0, 0, 0)
+    score_three = score.Score.from_tuple(0, 0, 2, 0, 0, 0, 0)
+    score_four = score.Score.from_tuple(0, 0, 0, 0, 1, 0, 0)
     score_accumulated = score_one.add(score_two)
     score_accumulated.add(score_three)
     score_accumulated.add(score_four)
     assert score_accumulated.get_total_runs() == 9
     assert score_accumulated.get_ran_runs() == 6
     assert score_accumulated.get_extra_runs() == 5
+
+
+def test_runs_scored():
+    score_text = "."
+    test_score = score.Score.parse(score_text)
+    assert test_score.runs_off_bat == 0

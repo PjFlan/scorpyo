@@ -24,9 +24,14 @@ class Score:
         self.wickets = wickets
         self.valid_deliveries = 0
         self.wide_deliveries = 0
-        self._set_calculated_data()
 
-    def _set_calculated_data(self):
+    @classmethod
+    def from_tuple(cls, *args):
+        new_score = cls(*args)
+        new_score.set_calculated_data()
+        return new_score
+
+    def set_calculated_data(self):
         self.valid_deliveries = int(self.is_valid_delivery())
         self.wide_deliveries = 1 if self.wide_runs > 0 else 0
 
@@ -38,11 +43,11 @@ class Score:
     @classmethod
     def parse(cls, score_text: str):
         if score_text == ".":
-            return DOT_BALL
+            return Score.from_tuple(0, 0, 0, 0, 0, 0, 0)
         if score_text == "W":
-            return WICKET_BALL
+            return Score.from_tuple(0, 0, 0, 0, 0, 0, 1)
         if score_text == "w":
-            return WIDE_BALL
+            return Score.from_tuple(0, 1, 0, 0, 0, 0, 0)
         groups = cls.SCORE_PATTERN.search(score_text)
         try:
             runs_scored = int(groups.group("num"))
@@ -52,20 +57,20 @@ class Score:
         runs_off_bat = runs_scored
         if modifier:
             if modifier == "W":
-                return Score(runs_off_bat, 0, 0, 0, 0, 0, 1)
+                return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 1)
             elif modifier == "w":
-                return Score(0, runs_scored, 0, 0, 0, 0, 0)
+                return Score.from_tuple(0, runs_scored, 0, 0, 0, 0, 0)
             elif modifier == "nb":
                 runs_off_bat -= 1
-                return Score(runs_off_bat, 0, 0, 0, 1, 0, 0)
+                return Score.from_tuple(runs_off_bat, 0, 0, 0, 1, 0, 0)
             elif modifier == "b":
-                return Score(0, 0, 0, runs_scored, 0, 0, 0)
+                return Score.from_tuple(0, 0, 0, runs_scored, 0, 0, 0)
             elif modifier == "lb":
-                return Score(0, 0, runs_scored, 0, 0, 0, 0)
+                return Score.from_tuple(0, 0, runs_scored, 0, 0, 0, 0)
             else:
                 raise ValueError(f"Unknown modifier: {modifier}")
         else:
-            return Score(runs_off_bat, 0, 0, 0, 0, 0, 0)
+            return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 0)
 
     def add(self, new_score):
         self.runs_off_bat += new_score.runs_off_bat
@@ -97,6 +102,6 @@ class Score:
 
 
 BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)
-DOT_BALL = Score(1, 0, 0, 0, 0, 0, 0)
-WICKET_BALL = Score(0, 0, 0, 0, 0, 0, 1)
-WIDE_BALL = Score(0, 1, 0, 0, 0, 0, 0)
+DOT_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 0)
+WICKET_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 1)
+WIDE_BALL = Score.from_tuple(0, 1, 0, 0, 0, 0, 0)

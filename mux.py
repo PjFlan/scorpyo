@@ -18,7 +18,7 @@ class MatchMux:
         elif event_type == EventType.INNINGS_STARTED.value:
             new_event = self.current_match.on_new_innings(payload)
         elif event_type == EventType.BALL_COMPLETED:
-            new_event = self.current_match.on_ball_completed()
+            new_event = self.current_match.on_ball_completed(payload)
         if new_event:
             self._event_registrar.add(new_event)
         else:

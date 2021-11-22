@@ -1,4 +1,4 @@
-from events import InningsStartedEvent
+from events import InningsStartedEvent, BallCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
 from util import Scoreable
@@ -39,6 +39,8 @@ class Match(Scoreable):
         self.match_inningses.append(new_innings)
         return innings_started_event
 
-    def on_ball_completed(self, ball_completed_event):
+    def on_ball_completed(self, payload: dict, registrar: FixedDataRegistrar):
+        ball_completed_event = BallCompletedEvent.build(payload, registrar)
         super().on_ball_completed(ball_completed_event)
         self.get_current_innings().on_ball_completed(ball_completed_event)
+        return ball_completed_event
