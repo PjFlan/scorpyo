@@ -7,11 +7,13 @@ from static_data import HOME_PLAYERS
 def test_ball_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.get_striker() == HOME_PLAYERS[0]
-    event = BallCompletedEvent.build(payload,
-                                     mock_innings.get_striker(),
-                                     mock_innings.get_non_striker(),
-                                     mock_innings.get_current_bowler(),
-                                     registrar)
+    event = BallCompletedEvent.build(
+        payload,
+        mock_innings.get_striker(),
+        mock_innings.get_non_striker(),
+        mock_innings.get_current_bowler(),
+        registrar,
+    )
     assert event.ball_score.runs_off_bat == 1
     mock_innings.on_ball_completed(event)
     assert mock_innings.off_strike_innings.runs_scored() == 1
@@ -21,11 +23,13 @@ def test_ball_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
 def test_strike_rotates(mock_innings: Innings, registrar: FixedDataRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.get_striker() == HOME_PLAYERS[0]
-    event = BallCompletedEvent.build(payload,
-                                     mock_innings.get_striker(),
-                                     mock_innings.get_non_striker(),
-                                     mock_innings.get_current_bowler(),
-                                     registrar)
+    event = BallCompletedEvent.build(
+        payload,
+        mock_innings.get_striker(),
+        mock_innings.get_non_striker(),
+        mock_innings.get_current_bowler(),
+        registrar,
+    )
     assert event.players_crossed
     assert event.ball_score.runs_off_bat == 1
     mock_innings.on_ball_completed(event)
@@ -34,20 +38,24 @@ def test_strike_rotates(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert mock_innings.off_strike_innings.runs_scored() == 1
     assert mock_innings.on_strike_innings.runs_scored() == 0
     payload = {"score_text": "1"}
-    event = BallCompletedEvent.build(payload,
-                                     mock_innings.get_striker(),
-                                     mock_innings.get_non_striker(),
-                                     mock_innings.get_current_bowler(),
-                                     registrar)
+    event = BallCompletedEvent.build(
+        payload,
+        mock_innings.get_striker(),
+        mock_innings.get_non_striker(),
+        mock_innings.get_current_bowler(),
+        registrar,
+    )
     mock_innings.on_ball_completed(event)
     expected_on_strike = HOME_PLAYERS[0]
     assert mock_innings.get_striker() == expected_on_strike
     payload = {"score_text": "2"}
-    event = BallCompletedEvent.build(payload,
-                                     mock_innings.get_striker(),
-                                     mock_innings.get_non_striker(),
-                                     mock_innings.get_current_bowler(),
-                                     registrar)
+    event = BallCompletedEvent.build(
+        payload,
+        mock_innings.get_striker(),
+        mock_innings.get_non_striker(),
+        mock_innings.get_current_bowler(),
+        registrar,
+    )
     mock_innings.on_ball_completed(event)
     assert mock_innings.get_striker() == expected_on_strike
 
@@ -78,9 +86,11 @@ def apply_ball_events(
     payloads: dict, registrar: FixedDataRegistrar, mock_innings: Innings
 ):
     for payload in payloads:
-        event = BallCompletedEvent.build(payload,
-                                         mock_innings.get_striker(),
-                                         mock_innings.get_non_striker(),
-                                         mock_innings.get_current_bowler(),
-                                         registrar)
+        event = BallCompletedEvent.build(
+            payload,
+            mock_innings.get_striker(),
+            mock_innings.get_non_striker(),
+            mock_innings.get_current_bowler(),
+            registrar,
+        )
         mock_innings.on_ball_completed(event)

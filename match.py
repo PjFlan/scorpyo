@@ -41,11 +41,13 @@ class Match(Scoreable):
 
     def on_ball_completed(self, payload: dict, registrar: FixedDataRegistrar):
         innings = self.get_current_innings()
-        ball_completed_event = BallCompletedEvent.build(payload,
-                                                        innings.get_striker(),
-                                                        innings.get_non_striker(),
-                                                        innings.get_current_bowler(),
-                                                        payload)
+        ball_completed_event = BallCompletedEvent.build(
+            payload,
+            innings.get_striker(),
+            innings.get_non_striker(),
+            innings.get_current_bowler(),
+            payload,
+        )
         super().on_ball_completed(ball_completed_event)
         self.get_current_innings().on_ball_completed(ball_completed_event)
         return ball_completed_event

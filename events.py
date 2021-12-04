@@ -99,8 +99,14 @@ class BallCompletedEvent:
         self.dismissal = dismissal
 
     @classmethod
-    def build(cls, payload: dict, striker: Player, non_striker: Player,
-              bowler: Player, registrar: FixedDataRegistrar):
+    def build(
+        cls,
+        payload: dict,
+        striker: Player,
+        non_striker: Player,
+        bowler: Player,
+        registrar: FixedDataRegistrar,
+    ):
         ball_score = Score.parse(payload["score_text"])
         for key in payload:
             if key == "on_strike":
@@ -116,8 +122,9 @@ class BallCompletedEvent:
                     NameableType.PLAYER, payload["bowler"]
                 )
             elif key == "dismissal":
-                dismissal = Dismissal.parse(payload["dismissal"], striker,
-                                            non_striker, bowler)
+                dismissal = Dismissal.parse(
+                    payload["dismissal"], striker, non_striker, bowler
+                )
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
             players_crossed = True
