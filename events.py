@@ -1,6 +1,7 @@
 import time
 from enum import Enum
 
+from dismissal import Dismissal
 from match_type import MatchType, get_match_type
 from player import Player
 from score import Score
@@ -88,17 +89,19 @@ class BallCompletedEvent:
         bowler,
         ball_score,
         players_crossed,
+        dismissal=None,
     ):
         self.on_strike = on_strike
         self.off_strike = off_strike
         self.bowler = bowler
         self.ball_score = ball_score
         self.players_crossed = players_crossed
+        self.dismissal = dismissal
 
     @classmethod
-    def build(cls, payload: dict, registrar: FixedDataRegistrar):
+    def build(cls, payload: dict, striker: Player, non_striker: Player,
+              bowler: Player, registrar: FixedDataRegistrar):
         ball_score = Score.parse(payload["score_text"])
-        striker = non_striker = bowler = None
         for key in payload:
             if key == "on_strike":
                 striker = registrar.get_fixed_data(
@@ -112,6 +115,9 @@ class BallCompletedEvent:
                 bowler = registrar.get_fixed_data(
                     NameableType.PLAYER, payload["bowler"]
                 )
+            elif key == "dismissal":
+                dismissal = Dismissal.parse(payload["dismissal"], striker,
+                                            non_striker, bowler)
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
             players_crossed = True
@@ -123,6 +129,7 @@ class BallCompletedEvent:
             bowler,
             ball_score,
             players_crossed,
+            dismissal,
         )
         return ball_completed_event
 
