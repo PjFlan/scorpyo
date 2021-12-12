@@ -102,7 +102,7 @@ class BowlerInnings(util.Scoreable):
         return self._score.valid_deliveries
 
     def runs_against(self):
-        return self._score.runs_off_bat
+        return self._score.runs_off_bat + self._score.get_bowler_extras()
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().on_ball_completed(bce)

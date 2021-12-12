@@ -100,6 +100,9 @@ class Score:
     def get_extra_runs(self):
         return self.leg_byes + self.byes + self.wide_runs + self.no_ball_runs
 
+    def get_bowler_extras(self):
+        return self.wide_runs + self.no_ball_runs + self.penalty_runs
+
 
 BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)
 DOT_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 0)

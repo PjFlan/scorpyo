@@ -16,6 +16,8 @@ class FixedDataRegistrar:
         self._id_counter = 0
 
     def get_fixed_data(self, object_type: NameableType, item_reference: any):
+        if not item_reference:
+            return
         search_list = self._store[object_type]
         lookup = "name" if isinstance(item_reference, str) else "unique_id"
         for test_item in search_list:

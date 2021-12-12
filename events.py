@@ -108,6 +108,7 @@ class BallCompletedEvent:
         registrar: FixedDataRegistrar,
     ):
         ball_score = Score.parse(payload["score_text"])
+        dismissal = None
         for key in payload:
             if key == "on_strike":
                 on_strike_player = registrar.get_fixed_data(
@@ -123,7 +124,11 @@ class BallCompletedEvent:
                 )
             elif key == "dismissal":
                 dismissal = Dismissal.parse(
-                    payload["dismissal"], on_strike_player, off_strike_player, bowler
+                    payload["dismissal"],
+                    on_strike_player,
+                    off_strike_player,
+                    bowler,
+                    registrar,
                 )
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:

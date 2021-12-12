@@ -1,4 +1,7 @@
+import functools
+
 from player import Player
+from registrar import FixedDataRegistrar, NameableType
 
 
 class DismissalType:
@@ -29,7 +32,7 @@ class DismissalType:
 
 
 BOWLED = DismissalType("bowled", "b", True, True, False)
-CAUGHT = DismissalType("caught", "c", True, True, True)
+CAUGHT = DismissalType("caught", "ct", True, True, True)
 LBW = DismissalType("leg before wicket", "lbw", True, True, False)
 STUMPED = DismissalType("stumped", "st", True, True, False)
 RUN_OUT = DismissalType("run out", "ro", False, False, True)
@@ -55,26 +58,34 @@ class Dismissal:
 
     @classmethod
     def parse(
-        cls, payload: dict, on_strike: Player, off_strike: Player, bowler: Player
+        cls,
+        payload: dict,
+        on_strike: Player,
+        off_strike: Player,
+        bowler: Player,
+        registrar: FixedDataRegistrar,
     ):
         dt = DismissalType.get_from_abbrv(payload["type"])
         if not dt.bowler_accredited and "bowler" in payload:
             raise ValueError(f"dismissal type {dt} should not specify a bowler")
         if not dt.batter_implied and "batter" not in payload:
             raise ValueError(f"dismissal type {dt} must specify batter")
-        batter = payload.get("batter")
-        if batter and batter not in [off_strike, on_strike]:
+        player_getter = functools.partial(registrar.get_fixed_data, NameableType.PLAYER)
+        payload_batter = player_getter(payload.get("batter"))
+        payload_bowler = player_getter(payload.get("bowler"))
+        fielder = player_getter(payload.get("fielder"))
+        if payload_batter and payload_batter not in [off_strike, on_strike]:
             raise ValueError(
-                f"batter specified in dismissal {dt}: {batter} is not "
+                f"batter specified in dismissal {dt}: {payload_batter} is not "
                 f"currently at the crease."
             )
-        batter = payload.get("batter", on_strike)
+        batter = payload_batter if payload_batter else on_strike
+        bowler = payload_bowler if payload_bowler else bowler
         if dt.batter_implied and not batter == on_strike:
             raise ValueError(
                 f"batter specified in dismissal {dt} is not consistent "
                 f"with current striker: {on_strike}"
             )
-        fielder = payload.get("fielder")
         if dt.needs_fielder and not fielder:
             raise ValueError(
                 f"dismissal type {dt} needs an associated fielder but "
