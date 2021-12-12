@@ -84,15 +84,15 @@ class InningsStartedEvent:
 class BallCompletedEvent:
     def __init__(
         self,
-        on_strike,
-        off_strike,
+        on_strike_player,
+        off_strike_player,
         bowler,
         ball_score,
         players_crossed,
         dismissal=None,
     ):
-        self.on_strike = on_strike
-        self.off_strike = off_strike
+        self.on_strike_player = on_strike_player
+        self.off_strike_player = off_strike_player
         self.bowler = bowler
         self.ball_score = ball_score
         self.players_crossed = players_crossed
@@ -102,19 +102,19 @@ class BallCompletedEvent:
     def build(
         cls,
         payload: dict,
-        striker: Player,
-        non_striker: Player,
+        on_strike_player: Player,
+        off_strike_player: Player,
         bowler: Player,
         registrar: FixedDataRegistrar,
     ):
         ball_score = Score.parse(payload["score_text"])
         for key in payload:
             if key == "on_strike":
-                striker = registrar.get_fixed_data(
+                on_strike_player = registrar.get_fixed_data(
                     NameableType.PLAYER, payload["on_strike"]
                 )
             elif key == "off_strike":
-                non_striker = registrar.get_fixed_data(
+                off_strike_player = registrar.get_fixed_data(
                     NameableType.PLAYER, payload["off_strike"]
                 )
             elif key == "bowler":
@@ -123,7 +123,7 @@ class BallCompletedEvent:
                 )
             elif key == "dismissal":
                 dismissal = Dismissal.parse(
-                    payload["dismissal"], striker, non_striker, bowler
+                    payload["dismissal"], on_strike_player, off_strike_player, bowler
                 )
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
@@ -131,8 +131,8 @@ class BallCompletedEvent:
         elif ball_score.get_ran_runs() % 2 == 1:
             players_crossed = True
         ball_completed_event = BallCompletedEvent(
-            striker,
-            non_striker,
+            on_strike_player,
+            off_strike_player,
             bowler,
             ball_score,
             players_crossed,

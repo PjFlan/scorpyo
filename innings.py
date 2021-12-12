@@ -1,7 +1,18 @@
+import enum
+
+from dismissal import Dismissal
 from events import BallCompletedEvent
 from over import Over
 from player import Player
 import util
+
+
+class BatterInningsState(enum.Enum):
+    IN_PROGRESS = 1
+    RETIRED_OUT = 2
+    RETIRED_NOT_OUT = 3
+    DISMISSED = 4
+    STRANDED = 5
 
 
 class Innings(util.Scoreable):
@@ -20,13 +31,13 @@ class Innings(util.Scoreable):
             batter_two,
             innings_started_event.opening_bowler,
         )
-        self.bowler_innings = BowlingInnings(
+        self.bowler_innings = BowlerInnings(
             innings_started_event.opening_bowler, first_over
         )
         self.overs = [first_over]
         self.on_strike_innings = batter_innings_one = BattingInnings(batter_one)
         self.off_strike_innings = batter_innings_two = BattingInnings(batter_two)
-        self.bowler_inningses = [BowlingInnings(self.bowler_innings, first_over)]
+        self.bowler_inningses = [BowlerInnings(self.bowler_innings, first_over)]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
         self.ball_in_innings_num = 0
         self.ball_in_over_num = 0
@@ -40,7 +51,7 @@ class Innings(util.Scoreable):
     def get_non_striker(self):
         return self.off_strike_innings.player
 
-    def get_current_bowler(self) -> "BowlingInnings":
+    def get_current_bowler(self) -> "BowlerInnings":
         return self.get_current_over().bowler
 
     def on_ball_completed(self, bce: BallCompletedEvent):
@@ -49,6 +60,12 @@ class Innings(util.Scoreable):
         self.ball_in_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
         self.on_strike_innings.on_ball_completed(bce)
+        if bce.dismissal:
+            dismissed_innings = find_player_innings(
+                bce.dismissal.batter,
+                self.batter_inningses,
+            )
+            dismissed_innings.on_dismissal(bce.dismissal)
         self.bowler_innings.on_ball_completed(bce)
         self.get_current_over().on_ball_completed(bce)
         if bce.players_crossed:
@@ -63,29 +80,34 @@ class BattingInnings(util.Scoreable):
         self.player = player
         self.balls = []
         self.dismissal = None
-
-    def on_ball_completed(self, ball_completed_event):
-        super().on_ball_completed(ball_completed_event)
+        self.batting_state = BatterInningsState.IN_PROGRESS
 
     def balls_faced(self):
         return self._score.valid_deliveries
 
+    def on_dismissal(self, dismissal: Dismissal):
+        self.dismissal = dismissal
+        self.batting_state = BatterInningsState.DISMISSED
 
-class BowlingInnings(util.Scoreable):
+
+class BowlerInnings(util.Scoreable):
     def __init__(self, player: Player, first_over: Over):
         super().__init__()
         self.player = player
         self.overs = [first_over]
         self.balls = []
-
-    def on_ball_completed(self, ball_completed_event):
-        super().on_ball_completed(ball_completed_event)
+        self.wickets = 0
 
     def balls_bowled(self):
         return self._score.valid_deliveries
 
     def runs_against(self):
         return self._score.runs_off_bat
+
+    def on_ball_completed(self, bce: BallCompletedEvent):
+        super().on_ball_completed(bce)
+        if bce.dismissal and bce.dismissal.bowler_accredited():
+            self.wickets += 1
 
 
 def find_player_innings(player: Player, inningses: list):

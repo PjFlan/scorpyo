@@ -2,6 +2,7 @@ from events import BallCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
 from static_data import HOME_PLAYERS
+from common import apply_ball_events
 
 
 def test_ball_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
@@ -80,17 +81,3 @@ def test_balls_faced_bowled(mock_innings: Innings, registrar: FixedDataRegistrar
     assert mock_innings.on_strike_innings.balls_faced() == 2
     assert mock_innings.off_strike_innings.balls_faced() == 2
     assert mock_innings.bowler_innings.balls_bowled() == 4
-
-
-def apply_ball_events(
-    payloads: dict, registrar: FixedDataRegistrar, mock_innings: Innings
-):
-    for payload in payloads:
-        event = BallCompletedEvent.build(
-            payload,
-            mock_innings.get_striker(),
-            mock_innings.get_non_striker(),
-            mock_innings.get_current_bowler(),
-            registrar,
-        )
-        mock_innings.on_ball_completed(event)

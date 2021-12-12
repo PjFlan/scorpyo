@@ -9,14 +9,14 @@ class DismissalType:
         self,
         name: str,
         abbrv: str,
-        is_bowler: bool,
+        bowler_accredited: bool,
         batter_implied: bool,
         needs_fielder: True,
     ):
         self.name = name
         self.abbrv = abbrv
-        self.is_bowler = is_bowler
-        self.needs_field = needs_fielder
+        self.bowler_accredited = bowler_accredited
+        self.needs_fielder = needs_fielder
         self.batter_implied = batter_implied
         self._dismissals[abbrv] = self
 
@@ -58,7 +58,7 @@ class Dismissal:
         cls, payload: dict, on_strike: Player, off_strike: Player, bowler: Player
     ):
         dt = DismissalType.get_from_abbrv(payload["type"])
-        if not dt.is_bowler and "bowler" in payload:
+        if not dt.bowler_accredited and "bowler" in payload:
             raise ValueError(f"dismissal type {dt} should not specify a bowler")
         if not dt.batter_implied and "batter" not in payload:
             raise ValueError(f"dismissal type {dt} must specify batter")
@@ -80,4 +80,7 @@ class Dismissal:
                 f"dismissal type {dt} needs an associated fielder but "
                 f"none was specified"
             )
-        return cls(dt, batter, bowler, fielder)
+        return Dismissal(dt, batter, bowler, fielder)
+
+    def bowler_accredited(self):
+        return self.dismissal_type.bowler_accredited
