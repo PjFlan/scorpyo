@@ -1,7 +1,7 @@
-from events import InningsStartedEvent, BallCompletedEvent
+from events import InningsStartedEvent, BallCompletedEvent, BatterInningsCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
-from util import Scoreable
+from score import Scoreable
 
 
 class Match(Scoreable):
@@ -34,20 +34,27 @@ class Match(Scoreable):
             raise ValueError(f"Match already has {self.get_max_innings()} innings")
         if len(self.match_inningses) > 0 and not self.match_inningses[-1].is_complete:
             raise ValueError("Previous innings has not yet ended.")
-        innings_started_event = InningsStartedEvent.build(payload, registrar, self)
-        new_innings = Innings(innings_started_event)
+        ise = InningsStartedEvent.build(payload, registrar, self)
+        new_innings = Innings(ise)
         self.match_inningses.append(new_innings)
-        return innings_started_event
+        return ise
 
     def on_ball_completed(self, payload: dict, registrar: FixedDataRegistrar):
         innings = self.get_current_innings()
-        ball_completed_event = BallCompletedEvent.build(
+        bce = BallCompletedEvent.build(
             payload,
             innings.get_striker(),
             innings.get_non_striker(),
             innings.get_current_bowler(),
             payload,
         )
-        super().on_ball_completed(ball_completed_event)
-        self.get_current_innings().on_ball_completed(ball_completed_event)
-        return ball_completed_event
+        super().on_ball_completed(bce)
+        self.get_current_innings().on_ball_completed(bce)
+        return bce
+
+    def on_batter_innings_completed(self, payload: dict, registrar: FixedDataRegistrar):
+        innings = self.get_current_innings()
+        bic = BatterInningsCompletedEvent.build(payload,
+                                                registrar)
+        innings.on_batter_innings_completed(bic)
+        return bic

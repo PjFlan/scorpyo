@@ -1,4 +1,6 @@
-from innings import Innings, BatterInningsState
+from dismissal import BatterInningsState
+from events import BatterInningsCompletedEvent
+from innings import Innings
 from registrar import FixedDataRegistrar
 from common import apply_ball_events
 
@@ -51,3 +53,12 @@ def test_run_out(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert mock_innings.on_strike_innings.runs_scored() == 2
     prev_ball = mock_innings.get_previous_ball()
     assert prev_ball.dismissal.fielder == thrower
+
+
+def test_innings_completed_event(mock_innings: Innings, registrar: FixedDataRegistrar):
+    payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    apply_ball_events(payloads, registrar, mock_innings)
+    payload = {"batter": "Padraic Flanagan", "reason": "d"}
+    bic = BatterInningsCompletedEvent.build(payload, registrar)
+    mock_innings.on_batter_innings_completed(bic)
+    assert mock_innings.on_strike_innings is None

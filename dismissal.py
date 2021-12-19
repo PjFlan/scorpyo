@@ -1,7 +1,8 @@
+import enum
 import functools
 
 from player import Player
-from registrar import FixedDataRegistrar, NameableType
+from registrar import FixedDataRegistrar, Nameable
 
 
 class DismissalType:
@@ -70,7 +71,7 @@ class Dismissal:
             raise ValueError(f"dismissal type {dt} should not specify a bowler")
         if not dt.batter_implied and "batter" not in payload:
             raise ValueError(f"dismissal type {dt} must specify batter")
-        player_getter = functools.partial(registrar.get_fixed_data, NameableType.PLAYER)
+        player_getter = functools.partial(registrar.get_fixed_data, Nameable.PLAYER)
         payload_batter = player_getter(payload.get("batter"))
         payload_bowler = player_getter(payload.get("bowler"))
         fielder = player_getter(payload.get("fielder"))
@@ -95,3 +96,11 @@ class Dismissal:
 
     def bowler_accredited(self):
         return self.dismissal_type.bowler_accredited
+
+
+class BatterInningsState(enum.Enum):
+    IN_PROGRESS = "i"
+    RETIRED_OUT = "ro"
+    RETIRED_NOT_OUT = "rno"
+    DISMISSED = "d"
+    STRANDED = "s"

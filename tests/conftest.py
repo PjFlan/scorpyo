@@ -3,7 +3,7 @@ import pytest
 import match_type
 from match import Match
 from mux import MatchMux
-from registrar import FixedDataRegistrar, NameableType
+from registrar import FixedDataRegistrar, Nameable
 
 test_players_home = ["Padraic Flanagan", "Jack Tector", "Harry Tector", "Bobby Gamble"]
 test_players_away = ["JJ Cassidy", "Callum Donnelly", "Tim Tector", "Oliver Gunning"]
@@ -46,7 +46,7 @@ def mock_match():
 @pytest.fixture()
 def mock_innings(registrar):
     mock_match = MockMatch()
-    teams = registrar.get_all_of_type(NameableType.TEAM)
+    teams = registrar.get_all_of_type(Nameable.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]

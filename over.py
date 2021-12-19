@@ -1,8 +1,9 @@
 from player import Player
+from score import Scoreable
 import util
 
 
-class Over(util.Scoreable):
+class Over(Scoreable):
     def __init__(
         self,
         innings_id: int,

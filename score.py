@@ -108,3 +108,21 @@ BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)
 DOT_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 0)
 WICKET_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 1)
 WIDE_BALL = Score.from_tuple(0, 1, 0, 0, 0, 0, 0)
+
+
+class Scoreable:
+    def __init__(self):
+        self._ball_events = []
+        self._score = Score(0, 0, 0, 0, 0, 0, 0)
+
+    def on_ball_completed(self, ball_completed_event):
+        self._ball_events.append(ball_completed_event)
+        self._score.add(ball_completed_event.ball_score)
+
+    def get_previous_ball(self) -> "BallCompletedEvent":
+        if len(self._ball_events) == 0:
+            return None
+        return self._ball_events[-1]
+
+    def runs_scored(self) -> int:
+        return self._score.runs_off_bat

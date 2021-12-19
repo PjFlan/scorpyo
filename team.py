@@ -1,5 +1,5 @@
 from player import Player
-from util import FixedData
+from fixed_data import FixedData
 
 
 class Team(FixedData):
@@ -16,3 +16,6 @@ class Team(FixedData):
 
     def get_line_up(self):
         return self._line_up
+
+    def __contains__(self, player: Player):
+        return player in self._line_up

@@ -1,6 +1,6 @@
 import itertools
 
-from registrar import FixedDataRegistrar, NameableType
+from registrar import FixedDataRegistrar, Nameable
 from static_data import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -12,8 +12,8 @@ def test_registrar():
     for name in test_names:
         line_up.append(registrar.create_player(name))
     team_one = registrar.create_team(test_team_home, line_up)
-    assert line_up[0] is registrar.get_fixed_data(NameableType.PLAYER, test_names[0])
-    assert team_one is registrar.get_fixed_data(NameableType.TEAM, test_team_home)
+    assert line_up[0] is registrar.get_fixed_data(Nameable.PLAYER, test_names[0])
+    assert team_one is registrar.get_fixed_data(Nameable.TEAM, test_team_home)
 
 
 def test_unique_id(registrar):
@@ -40,7 +40,7 @@ def test_new_match(mux, registrar):
 
 
 def test_new_innings(mux, registrar, mock_match):
-    teams = registrar.get_all_of_type(NameableType.TEAM)
+    teams = registrar.get_all_of_type(Nameable.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = AWAY_PLAYERS[-1]

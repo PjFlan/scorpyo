@@ -1,43 +1,34 @@
-import enum
-
-from dismissal import Dismissal
-from events import BallCompletedEvent
+import util
+from dismissal import Dismissal, BatterInningsState
+from events import BallCompletedEvent, InningsStartedEvent, BatterInningsCompletedEvent
 from over import Over
 from player import Player
-import util
+from score import Scoreable
 
 
-class BatterInningsState(enum.Enum):
-    IN_PROGRESS = 1
-    RETIRED_OUT = 2
-    RETIRED_NOT_OUT = 3
-    DISMISSED = 4
-    STRANDED = 5
-
-
-class Innings(util.Scoreable):
-    def __init__(self, innings_started_event):
+class Innings(Scoreable):
+    def __init__(self, ise: InningsStartedEvent):
         super().__init__()
-        self.start_time = innings_started_event.start_time
-        self.innings_id = innings_started_event.innings_id
-        self.batting_team = innings_started_event.batting_team
-        self.bowling_team = innings_started_event.bowling_team
-        batter_one = innings_started_event.batting_team.batter_by_position(0)
-        batter_two = innings_started_event.batting_team.batter_by_position(1)
+        self.start_time = ise.start_time
+        self.innings_id = ise.innings_id
+        self.batting_team = ise.batting_team
+        self.bowling_team = ise.bowling_team
+        batter_one = ise.batting_team.batter_by_position(0)
+        batter_two = ise.batting_team.batter_by_position(1)
         first_over = Over(
             self.innings_id,
             0,
             batter_one,
             batter_two,
-            innings_started_event.opening_bowler,
+            ise.opening_bowler,
         )
         self.bowler_innings = BowlerInnings(
-            innings_started_event.opening_bowler, first_over
+            ise.opening_bowler, first_over
         )
         self.overs = [first_over]
         self.on_strike_innings = batter_innings_one = BattingInnings(batter_one)
         self.off_strike_innings = batter_innings_two = BattingInnings(batter_two)
-        self.bowler_inningses = [BowlerInnings(self.bowler_innings, first_over)]
+        self.bowler_inningses = [BowlerInnings(ise.opening_bowler, first_over)]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
         self.ball_in_innings_num = 0
         self.ball_in_over_num = 0
@@ -51,7 +42,7 @@ class Innings(util.Scoreable):
     def get_non_striker(self):
         return self.off_strike_innings.player
 
-    def get_current_bowler(self) -> "BowlerInnings":
+    def get_current_bowler(self) -> Player:
         return self.get_current_over().bowler
 
     def on_ball_completed(self, bce: BallCompletedEvent):
@@ -61,7 +52,7 @@ class Innings(util.Scoreable):
         self.ball_in_over_num += ball_increment
         self.on_strike_innings.on_ball_completed(bce)
         if bce.dismissal:
-            dismissed_innings = find_player_innings(
+            dismissed_innings = find_innings(
                 bce.dismissal.batter,
                 self.batter_inningses,
             )
@@ -73,8 +64,32 @@ class Innings(util.Scoreable):
                 self.on_strike_innings, self.off_strike_innings
             )
 
+    def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
+        if bic.batter not in self.batting_team:
+            raise ValueError("batter {bic.batter} is not part of batting team {"
+                             "self.batting_team}")
+        dismissed_innings = find_innings(bic.batter, self.batter_inningses)
+        if bic.batting_state == BatterInningsState.DISMISSED:
+            prev_dismissal = self.get_previous_ball().dismissal
+            if not prev_dismissal:
+                raise ValueError("inconsistent state: batter innings completed via "
+                                 "dismissal but previous delivery has no associated "
+                                 "dismissal")
+            elif prev_dismissal.batter != bic.batter:
+                raise ValueError(f"batter dismissed in previous ball: "
+                                 f"{prev_dismissal.batter} does not equal batter "
+                                 f"whose innings has just completed: {bic.batter}")
+            if dismissed_innings.batting_state != BatterInningsState.DISMISSED:
+                raise ValueError("inconsistent state: batter innings completed via a"
+                                 "dismissal but batter is currently in state: "
+                                 "{dismissed_innings.batting_state}")
+        if dismissed_innings == self.on_strike_innings:
+            self.on_strike_innings = None
+        else:
+            self.off_strike_innings = None
 
-class BattingInnings(util.Scoreable):
+
+class BattingInnings(Scoreable):
     def __init__(self, player: Player):
         super().__init__()
         self.player = player
@@ -90,7 +105,7 @@ class BattingInnings(util.Scoreable):
         self.batting_state = BatterInningsState.DISMISSED
 
 
-class BowlerInnings(util.Scoreable):
+class BowlerInnings(Scoreable):
     def __init__(self, player: Player, first_over: Over):
         super().__init__()
         self.player = player
@@ -110,7 +125,7 @@ class BowlerInnings(util.Scoreable):
             self.wickets += 1
 
 
-def find_player_innings(player: Player, inningses: list):
+def find_innings(player: Player, inningses: list):
     for innings in inningses:
         if innings.player == player:
             return innings
