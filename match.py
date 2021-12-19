@@ -54,7 +54,6 @@ class Match(Scoreable):
 
     def on_batter_innings_completed(self, payload: dict, registrar: FixedDataRegistrar):
         innings = self.get_current_innings()
-        bic = BatterInningsCompletedEvent.build(payload,
-                                                registrar)
+        bic = BatterInningsCompletedEvent.build(payload, registrar)
         innings.on_batter_innings_completed(bic)
         return bic

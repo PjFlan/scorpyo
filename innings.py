@@ -22,9 +22,7 @@ class Innings(Scoreable):
             batter_two,
             ise.opening_bowler,
         )
-        self.bowler_innings = BowlerInnings(
-            ise.opening_bowler, first_over
-        )
+        self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over)
         self.overs = [first_over]
         self.on_strike_innings = batter_innings_one = BattingInnings(batter_one)
         self.off_strike_innings = batter_innings_two = BattingInnings(batter_two)
@@ -66,23 +64,30 @@ class Innings(Scoreable):
 
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
         if bic.batter not in self.batting_team:
-            raise ValueError("batter {bic.batter} is not part of batting team {"
-                             "self.batting_team}")
+            raise ValueError(
+                "batter {bic.batter} is not part of batting team {" "self.batting_team}"
+            )
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
         if bic.batting_state == BatterInningsState.DISMISSED:
             prev_dismissal = self.get_previous_ball().dismissal
             if not prev_dismissal:
-                raise ValueError("inconsistent state: batter innings completed via "
-                                 "dismissal but previous delivery has no associated "
-                                 "dismissal")
+                raise ValueError(
+                    "inconsistent state: batter innings completed via "
+                    "dismissal but previous delivery has no associated "
+                    "dismissal"
+                )
             elif prev_dismissal.batter != bic.batter:
-                raise ValueError(f"batter dismissed in previous ball: "
-                                 f"{prev_dismissal.batter} does not equal batter "
-                                 f"whose innings has just completed: {bic.batter}")
+                raise ValueError(
+                    f"batter dismissed in previous ball: "
+                    f"{prev_dismissal.batter} does not equal batter "
+                    f"whose innings has just completed: {bic.batter}"
+                )
             if dismissed_innings.batting_state != BatterInningsState.DISMISSED:
-                raise ValueError("inconsistent state: batter innings completed via a"
-                                 "dismissal but batter is currently in state: "
-                                 "{dismissed_innings.batting_state}")
+                raise ValueError(
+                    "inconsistent state: batter innings completed via a"
+                    "dismissal but batter is currently in state: "
+                    "{dismissed_innings.batting_state}"
+                )
         if dismissed_innings == self.on_strike_innings:
             self.on_strike_innings = None
         else:
