@@ -1,7 +1,5 @@
 from typing import NamedTuple
 
-from score import Scoreable
-
 
 class MatchType(NamedTuple):
     innings: int

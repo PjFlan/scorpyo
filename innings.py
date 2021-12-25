@@ -44,7 +44,7 @@ class Innings(Scoreable):
         return self.get_current_over().bowler
 
     def on_ball_completed(self, bce: BallCompletedEvent):
-        super().on_ball_completed(bce)
+        super().update_score(bce)
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
         self.ball_in_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
@@ -102,6 +102,9 @@ class BattingInnings(Scoreable):
         self.dismissal = None
         self.batting_state = BatterInningsState.IN_PROGRESS
 
+    def on_ball_completed(self, bce: BallCompletedEvent):
+        super().update_score(bce)
+
     def balls_faced(self):
         return self._score.valid_deliveries
 
@@ -125,7 +128,7 @@ class BowlerInnings(Scoreable):
         return self._score.runs_off_bat + self._score.get_bowler_extras()
 
     def on_ball_completed(self, bce: BallCompletedEvent):
-        super().on_ball_completed(bce)
+        super().update_score(bce)
         if bce.dismissal and bce.dismissal.bowler_accredited():
             self.wickets += 1
 

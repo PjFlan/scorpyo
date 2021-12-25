@@ -4,7 +4,7 @@ from dismissal import BatterInningsState
 from events import BatterInningsCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
-from common import apply_ball_events
+from .common import apply_ball_events
 
 
 def test_bowled(mock_innings: Innings, registrar: FixedDataRegistrar):

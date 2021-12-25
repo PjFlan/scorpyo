@@ -1,3 +1,4 @@
+from events import BallCompletedEvent
 from player import Player
 from score import Scoreable
 import util
@@ -19,9 +20,13 @@ class Over(Scoreable):
         self.off_strike = off_strike
         self.bowler = bowler
 
-    def on_ball_completed(self, ball_completed_event):
-        super().on_ball_completed(ball_completed_event)
-        if ball_completed_event.players_crossed:
+    def on_ball_completed(self, bce: BallCompletedEvent):
+        super().update_score(bce)
+        if bce.players_crossed:
+            # TODO: we already calculate this further upstream
+            # probably safer to propagate that state somehow
+            # maybe the over just stores a reference to the innings
+            # which tracks all relevant state
             self.on_strike, self.off_strike = util.switch_strike(
                 self.on_strike, self.off_strike
             )

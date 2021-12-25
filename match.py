@@ -1,6 +1,5 @@
-from events import InningsStartedEvent, BallCompletedEvent, BatterInningsCompletedEvent
+from events import BallCompletedEvent, BatterInningsCompletedEvent
 from innings import Innings
-from registrar import FixedDataRegistrar
 from score import Scoreable
 
 
@@ -29,31 +28,18 @@ class Match(Scoreable):
     def get_current_innings(self):
         return self.match_inningses[-1]
 
-    def on_new_innings(self, payload: dict, registrar: FixedDataRegistrar):
+    def add_innings(self, innings: Innings):
+        self.match_inningses.append(innings)
+
+    def validate(self):
         if len(self.match_inningses) == self.get_max_innings():
             raise ValueError(f"Match already has {self.get_max_innings()} innings")
         if len(self.match_inningses) > 0 and not self.match_inningses[-1].is_complete:
             raise ValueError("Previous innings has not yet ended.")
-        ise = InningsStartedEvent.build(payload, registrar, self)
-        new_innings = Innings(ise)
-        self.match_inningses.append(new_innings)
-        return ise
 
-    def on_ball_completed(self, payload: dict, registrar: FixedDataRegistrar):
-        innings = self.get_current_innings()
-        bce = BallCompletedEvent.build(
-            payload,
-            innings.get_striker(),
-            innings.get_non_striker(),
-            innings.get_current_bowler(),
-            payload,
-        )
-        super().on_ball_completed(bce)
+    def on_ball_completed(self, bce: BallCompletedEvent):
+        super().update_score(bce)
         self.get_current_innings().on_ball_completed(bce)
-        return bce
 
-    def on_batter_innings_completed(self, payload: dict, registrar: FixedDataRegistrar):
-        innings = self.get_current_innings()
-        bic = BatterInningsCompletedEvent.build(payload, registrar)
-        innings.on_batter_innings_completed(bic)
-        return bic
+    def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
+        self.get_current_innings().on_batter_innings_completed(bic)

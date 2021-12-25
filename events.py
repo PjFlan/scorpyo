@@ -2,13 +2,20 @@ import time
 from enum import Enum
 
 from dismissal import Dismissal, BatterInningsState
-from match_type import MatchType, get_match_type
+from static_data.match import MatchType, get_match_type
 from player import Player
 from score import Score
 from team import Team
 from registrar import FixedDataRegistrar, Nameable
 
 
+# TODO: this needs to be refactored away from using static build methods.
+# Should define an Event interface with methods to build a dict representation useful
+# for replaying event and for reacting to events downstream.
+# Each event should have its own decoder that knows what payloads to look for
+# and then any business logic should be reserved for the downstream object.
+# Each event should be passed a static data store or equivalent to allow the decoder
+# to take raw text payload and produce a dict of objects
 class EventType(Enum):
     MATCH_STARTED = 0
     MATCH_TEAM_ADDED = 1

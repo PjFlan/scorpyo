@@ -1,3 +1,4 @@
+import abc
 import re
 
 
@@ -104,22 +105,20 @@ class Score:
         return self.wide_runs + self.no_ball_runs + self.penalty_runs
 
 
-BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)
-DOT_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 0)
-WICKET_BALL = Score.from_tuple(0, 0, 0, 0, 0, 0, 1)
-WIDE_BALL = Score.from_tuple(0, 1, 0, 0, 0, 0, 0)
-
-
-class Scoreable:
+class Scoreable(abc.ABC):
     def __init__(self):
         self._ball_events = []
         self._score = Score(0, 0, 0, 0, 0, 0, 0)
 
-    def on_ball_completed(self, ball_completed_event):
-        self._ball_events.append(ball_completed_event)
-        self._score.add(ball_completed_event.ball_score)
+    @abc.abstractmethod
+    def on_ball_completed(self, bce: "BallCompletedEvent"):
+        pass
 
-    def get_previous_ball(self) -> "BallCompletedEvent":
+    def update_score(self, bce: "BallCompletedEvent"):
+        self._ball_events.append(bce)
+        self._score.add(bce.ball_score)
+
+    def get_previous_ball(self):
         if len(self._ball_events) == 0:
             return None
         return self._ball_events[-1]

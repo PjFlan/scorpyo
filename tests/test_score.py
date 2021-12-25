@@ -1,6 +1,6 @@
 import pytest
 
-import score
+from static_data import score
 
 
 def scores_equal(score_one, score_two):

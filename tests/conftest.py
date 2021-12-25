@@ -1,9 +1,11 @@
 import pytest
 
-import match_type
+from engine import MatchEngine
+from events import InningsStartedEvent
+from innings import Innings
 from match import Match
-from mux import MatchMux
 from registrar import FixedDataRegistrar, Nameable
+import static_data.match as match
 
 test_players_home = ["Padraic Flanagan", "Jack Tector", "Harry Tector", "Bobby Gamble"]
 test_players_away = ["JJ Cassidy", "Callum Donnelly", "Tim Tector", "Oliver Gunning"]
@@ -16,7 +18,7 @@ class MockMatch(Match):
     def __init__(self):
         self.match_id = 12345
         self.match_inningses = []
-        self.match_type = match_type.TWENTY_20
+        self.match_type = match.TWENTY_20
 
 
 @pytest.fixture()
@@ -35,7 +37,7 @@ def registrar():
 
 @pytest.fixture()
 def mux(registrar):
-    return MatchMux(registrar)
+    return MatchEngine(registrar)
 
 
 @pytest.fixture()
@@ -51,5 +53,7 @@ def mock_innings(registrar):
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]
     payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
-    mock_match.on_new_innings(payload, registrar)
+    ise = InningsStartedEvent.build(payload, registrar, mock_match)
+    mock_innings = Innings(ise)
+    mock_match.add_innings(mock_innings)
     return mock_match.get_current_innings()
