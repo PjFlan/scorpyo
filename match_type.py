@@ -1,6 +1,12 @@
-from collections import namedtuple
+from typing import NamedTuple
 
-MatchType = namedtuple("MatchType", "innings overs")
+from score import Scoreable
+
+
+class MatchType(NamedTuple):
+    innings: int
+    overs: int
+
 
 TWENTY_20 = MatchType(1, 20)
 ONE_DAY = MatchType(1, 50)

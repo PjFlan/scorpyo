@@ -1,3 +1,5 @@
+import pytest
+
 from dismissal import BatterInningsState
 from events import BatterInningsCompletedEvent
 from innings import Innings
@@ -55,10 +57,50 @@ def test_run_out(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert prev_ball.dismissal.fielder == thrower
 
 
+def test_run_out_missing_batter(mock_innings: Innings, registrar: FixedDataRegistrar):
+    thrower = "Callum Donnelly"
+    payloads = [
+        {
+            "score_text": "2W",
+            "dismissal": {
+                "type": "ro",
+                "fielder": thrower,
+            },
+        }
+    ]
+    with pytest.raises(ValueError) as exc:
+        apply_ball_events(payloads, registrar, mock_innings)
+    assert "dismissal type run out must specify batter"
+
+
 def test_innings_completed_event(mock_innings: Innings, registrar: FixedDataRegistrar):
     payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    on_strike_player = mock_innings.get_striker()
     apply_ball_events(payloads, registrar, mock_innings)
-    payload = {"batter": "Padraic Flanagan", "reason": "d"}
+    payload = {"batter": on_strike_player.name, "reason": "d"}
     bic = BatterInningsCompletedEvent.build(payload, registrar)
     mock_innings.on_batter_innings_completed(bic)
+    assert mock_innings.on_strike_innings is None
+
+
+def test_innings_completed_event_off_strike(
+    mock_innings: Innings, registrar: FixedDataRegistrar
+):
+    thrower = "Callum Donnelly"
+    off_strike_player = mock_innings.get_non_striker()
+    payloads = [
+        {
+            "score_text": "1W",
+            "dismissal": {
+                "type": "ro",
+                "fielder": thrower,
+                "batter": off_strike_player.name,
+            },
+        }
+    ]
+    apply_ball_events(payloads, registrar, mock_innings)
+    payload = {"batter": off_strike_player.name, "reason": "d"}
+    bic = BatterInningsCompletedEvent.build(payload, registrar)
+    mock_innings.on_batter_innings_completed(bic)
+    assert mock_innings.off_strike_innings.runs_scored() == 1
     assert mock_innings.on_strike_innings is None
