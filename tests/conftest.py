@@ -2,15 +2,17 @@ import pytest
 
 from engine import MatchEngine
 from events import InningsStartedEvent
-from innings import Innings
 from match import Match
 from registrar import FixedDataRegistrar, Nameable
 import static_data.match as match
+from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
-test_players_home = ["Padraic Flanagan", "Jack Tector", "Harry Tector", "Bobby Gamble"]
-test_players_away = ["JJ Cassidy", "Callum Donnelly", "Tim Tector", "Oliver Gunning"]
-test_team_home = "YMCA CC"
-test_team_away = "Pembroke CC"
+
+# TODO: maybe these player names should be enums
+test_players_home = HOME_PLAYERS
+test_players_away = AWAY_PLAYERS
+test_team_home = HOME_TEAM
+test_team_away = AWAY_TEAM
 
 
 # noinspection PyMissingConstructor
@@ -54,6 +56,5 @@ def mock_innings(registrar):
     bowler_name = test_players_away[-1]
     payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
     ise = InningsStartedEvent.build(payload, registrar, mock_match)
-    mock_innings = Innings(ise)
-    mock_match.add_innings(mock_innings)
+    mock_match.on_new_innings(ise)
     return mock_match.get_current_innings()

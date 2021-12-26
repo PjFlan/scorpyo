@@ -104,6 +104,9 @@ class Score:
     def get_bowler_extras(self):
         return self.wide_runs + self.no_ball_runs + self.penalty_runs
 
+    def get_wickets(self):
+        return self.wickets
+
 
 class Scoreable(abc.ABC):
     def __init__(self):

@@ -1,6 +1,11 @@
 import util
 from dismissal import Dismissal, BatterInningsState
-from events import BallCompletedEvent, InningsStartedEvent, BatterInningsCompletedEvent
+from events import (
+    BallCompletedEvent,
+    InningsStartedEvent,
+    BatterInningsCompletedEvent,
+    BatterInningsStartedEvent,
+)
 from over import Over
 from player import Player
 from score import Scoreable
@@ -24,8 +29,8 @@ class Innings(Scoreable):
         )
         self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over)
         self.overs = [first_over]
-        self.on_strike_innings = batter_innings_one = BattingInnings(batter_one)
-        self.off_strike_innings = batter_innings_two = BattingInnings(batter_two)
+        self.on_strike_innings = batter_innings_one = BatterInnings(batter_one)
+        self.off_strike_innings = batter_innings_two = BatterInnings(batter_two)
         self.bowler_inningses = [BowlerInnings(ise.opening_bowler, first_over)]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
         self.ball_in_innings_num = 0
@@ -35,13 +40,33 @@ class Innings(Scoreable):
         return self.overs[-1]
 
     def get_striker(self):
+        if not self.on_strike_innings:
+            return None
         return self.on_strike_innings.player
 
     def get_non_striker(self):
+        if not self.off_strike_innings:
+            return None
         return self.off_strike_innings.player
 
     def get_current_bowler(self) -> Player:
         return self.get_current_over().bowler
+
+    def get_wickets_down(self) -> int:
+        return self._score.get_wickets()
+
+    def get_next_batter(self) -> Player:
+        num_down = self.get_wickets_down()
+        next_batter_index = num_down + 1
+        try:
+            next_batter = self.batting_team.batter_by_position(next_batter_index)
+        except IndexError as e:
+            raise e
+        return next_batter
+
+    def get_batter_innings(self, player: Player) -> "BatterInnings":
+        batter_innings = find_innings(player, self.batter_inningses)
+        return batter_innings
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
@@ -93,8 +118,33 @@ class Innings(Scoreable):
         else:
             self.off_strike_innings = None
 
+    def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
+        if self.on_strike_innings and self.off_strike_innings:
+            raise ValueError(
+                "there are already two batters at the crease. Must "
+                "complete one of their innings before beginning a new one"
+            )
+        try:
+            existing = find_innings(bis.batter, self.batter_inningses)
+        except ValueError:
+            existing = None
+        if (
+            existing
+            and not existing.batting_state != BatterInningsState.RETIRED_NOT_OUT
+        ):
+            raise ValueError(
+                "batter {existing.batter} has already batted and cannot "
+                "bat again (current state {existing.batting_state})"
+            )
+        new_innings = BatterInnings(bis.batter)
+        self.batter_inningses.append(new_innings)
+        if not self.on_strike_innings:
+            self.on_strike_innings = new_innings
+        else:
+            self.off_strike_innings = new_innings
 
-class BattingInnings(Scoreable):
+
+class BatterInnings(Scoreable):
     def __init__(self, player: Player):
         super().__init__()
         self.player = player

@@ -11,10 +11,10 @@ from registrar import FixedDataRegistrar, Nameable
 
 # TODO: this needs to be refactored away from using static build methods.
 # Should define an Event interface with methods to build a dict representation useful
-# for replaying event and for reacting to events downstream.
-# Each event should have its own decoder that knows what payloads to look for
+# for replaying events and for reacting to events downstream.
+# Each event should have its own payload handler that knows what payloads to look for
 # and then any business logic should be reserved for the downstream object.
-# Each event should be passed a static data store or equivalent to allow the decoder
+# Each event should be passed a static data store or equivalent to allow the handler
 # to take raw text payload and produce a dict of objects
 class EventType(Enum):
     MATCH_STARTED = 0
@@ -26,6 +26,7 @@ class EventType(Enum):
     INNINGS_COMPLETED = 6
     MATCH_COMPLETED = 7
     BATTER_INNINGS_COMPLETED = 8
+    BATTER_INNINGS_STARTED = 9
 
 
 class MatchStartedEvent:
@@ -162,6 +163,23 @@ class BatterInningsCompletedEvent:
         batter = registrar.get_fixed_data(Nameable.PLAYER, payload["batter"])
         state = BatterInningsState(payload["reason"])
         return BatterInningsCompletedEvent(batter, state)
+
+
+class BatterInningsStartedEvent:
+    def __init__(self, batter: Player):
+        self.batter = batter
+
+    @classmethod
+    def build(cls, payload: dict, registrar: FixedDataRegistrar, innings: "Innings"):
+        batter = registrar.get_fixed_data(Nameable.PLAYER, payload["batter"])
+        if not batter:
+            try:
+                batter = innings.get_next_batter()
+            except IndexError as e:
+                raise ValueError(
+                    "cannot process new batter innings as there are no " "players left"
+                )
+        return BatterInningsStartedEvent(batter)
 
 
 def get_current_time():

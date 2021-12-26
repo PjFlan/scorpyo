@@ -1,4 +1,3 @@
-from innings import Innings
 from match import Match
 from events import (
     EventType,
@@ -6,6 +5,7 @@ from events import (
     BallCompletedEvent,
     InningsStartedEvent,
     BatterInningsCompletedEvent,
+    BatterInningsStartedEvent,
 )
 from registrar import EventRegistrar, FixedDataRegistrar
 
@@ -26,21 +26,25 @@ class MatchEngine:
         elif event_type == EventType.INNINGS_STARTED.value:
             self.current_match.validate()
             new_event = InningsStartedEvent.build(payload, self.fd_registrar, self)
-            new_innings = Innings(new_event)
-            self.current_match.add_innings(new_innings)
-        elif event_type == EventType.BALL_COMPLETED:
+            self.current_match.on_new_innings(new_event)
+        elif event_type == EventType.BALL_COMPLETED.value:
             curr_innings = self.current_match.get_current_innings()
-            bce = BallCompletedEvent.build(
+            new_event = BallCompletedEvent.build(
                 payload,
                 curr_innings.get_striker(),
                 curr_innings.get_non_striker(),
                 curr_innings.get_current_bowler(),
                 self.fd_registrar,
             )
-            new_event = self.current_match.on_ball_completed(bce)
-        elif new_event == EventType.BATTER_INNINGS_COMPLETED:
+            self.current_match.on_ball_completed(new_event)
+        elif new_event == EventType.BATTER_INNINGS_COMPLETE.value:
             new_event = BatterInningsCompletedEvent.build(payload, self.fd_registrar)
             self.current_match.on_batter_innings_completed(new_event)
+        elif new_event == EventType.BATTER_INNINGS_STARTED.value:
+            new_event = BatterInningsStartedEvent.build(
+                payload, self.fd_registrar, self.current_match.get_current_innings()
+            )
+            self.current_match.on_batter_innings_started(new_event)
         if new_event:
             self.event_registrar.add(new_event)
         else:

@@ -1,7 +1,7 @@
 import pytest
 
 from dismissal import BatterInningsState
-from events import BatterInningsCompletedEvent
+from events import BatterInningsCompletedEvent, BatterInningsStartedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
 from .common import apply_ball_events
@@ -104,3 +104,39 @@ def test_innings_completed_event_off_strike(
     mock_innings.on_batter_innings_completed(bic)
     assert mock_innings.off_strike_innings.runs_scored() == 1
     assert mock_innings.on_strike_innings is None
+
+
+def test_new_batter_innings(mock_innings: Innings, registrar: FixedDataRegistrar):
+    prev_on_strike_player = mock_innings.get_striker()
+    off_strike_player = mock_innings.get_non_striker()
+    payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    apply_ball_events(payloads, registrar, mock_innings)
+    bic_payload = {"batter": prev_on_strike_player.name, "reason": "d"}
+    bic = BatterInningsCompletedEvent.build(bic_payload, registrar)
+    mock_innings.on_batter_innings_completed(bic)
+    bis_payload = {"batter": ""}
+    bis = BatterInningsStartedEvent.build(bis_payload, registrar, mock_innings)
+    mock_innings.on_batter_innings_started(bis)
+    assert mock_innings.get_striker() == "Harry Tector"
+    assert mock_innings.get_non_striker() == off_strike_player
+    prev_batter_innings = mock_innings.get_batter_innings(prev_on_strike_player)
+    assert prev_batter_innings.batting_state == BatterInningsState.DISMISSED
+
+
+def test_new_batter_innings_explicit(
+    mock_innings: Innings, registrar: FixedDataRegistrar
+):
+    prev_on_strike_player = mock_innings.get_striker()
+    off_strike_player = mock_innings.get_non_striker()
+    payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    apply_ball_events(payloads, registrar, mock_innings)
+    bic_payload = {"batter": prev_on_strike_player.name, "reason": "d"}
+    bic = BatterInningsCompletedEvent.build(bic_payload, registrar)
+    mock_innings.on_batter_innings_completed(bic)
+    bis_payload = {"batter": "Bobby Gamble"}
+    bis = BatterInningsStartedEvent.build(bis_payload, registrar, mock_innings)
+    mock_innings.on_batter_innings_started(bis)
+    assert mock_innings.get_striker() == "Bobby Gamble"
+    assert mock_innings.get_non_striker() == off_strike_player
+    prev_batter_innings = mock_innings.get_batter_innings(prev_on_strike_player)
+    assert prev_batter_innings.batting_state == BatterInningsState.DISMISSED

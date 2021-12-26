@@ -1,4 +1,9 @@
-from events import BallCompletedEvent, BatterInningsCompletedEvent
+from events import (
+    BallCompletedEvent,
+    BatterInningsCompletedEvent,
+    InningsStartedEvent,
+    BatterInningsStartedEvent,
+)
 from innings import Innings
 from score import Scoreable
 
@@ -37,9 +42,16 @@ class Match(Scoreable):
         if len(self.match_inningses) > 0 and not self.match_inningses[-1].is_complete:
             raise ValueError("Previous innings has not yet ended.")
 
+    def on_new_innings(self, ise: InningsStartedEvent):
+        new_innings = Innings(ise)
+        self.add_innings(new_innings)
+
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
         self.get_current_innings().on_ball_completed(bce)
 
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
         self.get_current_innings().on_batter_innings_completed(bic)
+
+    def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
+        self.get_current_innings().on_batter_innings_started(bis)

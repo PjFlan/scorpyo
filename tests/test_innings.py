@@ -1,7 +1,7 @@
 from events import BallCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
-from .static_data import HOME_PLAYERS
+from .static import HOME_PLAYERS
 from .common import apply_ball_events
 
 
