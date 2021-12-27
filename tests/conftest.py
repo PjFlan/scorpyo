@@ -1,7 +1,7 @@
 import pytest
 
+from context import Context
 from engine import MatchEngine
-from events import InningsStartedEvent
 from match import Match
 from registrar import FixedDataRegistrar, Nameable
 import static_data.match as match
@@ -34,12 +34,13 @@ def registrar():
         line_up_away.append(registrar.create_player(name))
     registrar.create_team(test_team_home, line_up_home)
     registrar.create_team(test_team_away, line_up_away)
+    Context.set_fd_registrar(registrar)
     return registrar
 
 
 @pytest.fixture()
 def mux(registrar):
-    return MatchEngine(registrar)
+    return MatchEngine()
 
 
 @pytest.fixture()
@@ -55,6 +56,5 @@ def mock_innings(registrar):
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]
     payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
-    ise = InningsStartedEvent.build(payload, registrar, mock_match)
-    mock_match.on_new_innings(ise)
+    mock_match.handle_innings_started(payload)
     return mock_match.get_current_innings()

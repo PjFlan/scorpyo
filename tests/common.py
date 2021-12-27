@@ -4,14 +4,7 @@ from registrar import FixedDataRegistrar
 
 
 def apply_ball_events(
-    payloads: dict, registrar: FixedDataRegistrar, mock_innings: Innings
+    payloads: list[dict], registrar: FixedDataRegistrar, mock_innings: Innings
 ):
     for payload in payloads:
-        event = BallCompletedEvent.build(
-            payload,
-            mock_innings.get_striker(),
-            mock_innings.get_non_striker(),
-            mock_innings.get_current_bowler(),
-            registrar,
-        )
-        mock_innings.on_ball_completed(event)
+        mock_innings.handle_ball_completed(payload)

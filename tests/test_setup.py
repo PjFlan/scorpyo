@@ -1,6 +1,5 @@
 import itertools
 
-from events import InningsStartedEvent
 from registrar import FixedDataRegistrar, Nameable
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
@@ -46,8 +45,7 @@ def test_new_innings(mux, registrar, mock_match):
     mock_match.away_team = teams[1]
     bowler_name = AWAY_PLAYERS[-1]
     payload = {"batting_team": HOME_TEAM, "opening_bowler": bowler_name}
-    ise = InningsStartedEvent.build(payload, registrar, mock_match)
-    mock_match.on_new_innings(ise)
+    mock_match.handle_innings_started(payload)
     assert mock_match.get_num_innings() == 1
     current_innings = mock_match.get_current_innings()
     assert current_innings.innings_id == 0

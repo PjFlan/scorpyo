@@ -1,22 +1,32 @@
+import util
+from context import Context
 from events import (
     BallCompletedEvent,
     BatterInningsCompletedEvent,
     InningsStartedEvent,
     BatterInningsStartedEvent,
+    MatchStartedEvent,
+    EventType,
 )
+from fixed_data import Nameable
 from innings import Innings
 from score import Scoreable
 
 
-class Match(Scoreable):
-    def __init__(self, match_started_event):
-        super().__init__()
-        self.match_id = match_started_event.match_id
-        self.start_time = match_started_event.start_time
-        self.match_type = match_started_event.match_type
-        self.home_team = match_started_event.home_team
-        self.away_team = match_started_event.away_team
+# TODO: I don't like multiple inheritance here
+# eventually I will probably need to create a new MatchContext
+# class, separate from Match
+class Match(Context, Scoreable):
+    def __init__(self, mse: MatchStartedEvent):
+        Context.__init__(self)
+        Scoreable.__init__(self)
+        self.match_id = mse.match_id
+        self.start_time = mse.start_time
+        self.match_type = mse.match_type
+        self.home_team = mse.home_team
+        self.away_team = mse.away_team
         self.match_inningses = []
+        self.add_handler(EventType.INNINGS_STARTED, self.handle_innings_started)
 
     def get_max_overs(self):
         return self.match_type.overs
@@ -42,9 +52,26 @@ class Match(Scoreable):
         if len(self.match_inningses) > 0 and not self.match_inningses[-1].is_complete:
             raise ValueError("Previous innings has not yet ended.")
 
-    def on_new_innings(self, ise: InningsStartedEvent):
+    def handle_innings_started(self, payload: dict):
+        start_time = util.get_current_time()
+        innings_id = self.get_num_innings()  # index innings from 0 not 1
+        batting_team = self.fd_registrar.get_fixed_data(
+            Nameable.TEAM, payload["batting_team"]
+        )
+        bowling_team = [team for team in self.get_teams() if team != batting_team][0]
+        opening_bowler = self.fd_registrar.get_fixed_data(
+            Nameable.PLAYER, payload["opening_bowler"]
+        )
+        ise = InningsStartedEvent(
+            innings_id, start_time, batting_team, bowling_team, opening_bowler
+        )
+        self.on_innings_started(ise)
+        return ise
+
+    def on_innings_started(self, ise: InningsStartedEvent):
         new_innings = Innings(ise)
         self.add_innings(new_innings)
+        self._child_context = new_innings
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
