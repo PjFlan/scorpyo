@@ -14,7 +14,7 @@ class Context:
     def set_fd_registrar(cls, fd_registrar: FixedDataRegistrar):
         cls.fd_registrar = fd_registrar
 
-    def add_handler(self, event_type: EventType, func):
+    def add_handler(self, event_type: EventType, func: callable):
         self._handlers[event_type] = func
 
     def handle_event(self, event_type: EventType, payload: dict):

@@ -3,7 +3,7 @@ import pytest
 from context import Context
 from engine import MatchEngine
 from match import Match
-from registrar import FixedDataRegistrar, Nameable
+from registrar import FixedDataRegistrar, Entities
 import static_data.match as match
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
@@ -51,7 +51,7 @@ def mock_match():
 @pytest.fixture()
 def mock_innings(registrar):
     mock_match = MockMatch()
-    teams = registrar.get_all_of_type(Nameable.TEAM)
+    teams = registrar.get_all_of_type(Entities.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]

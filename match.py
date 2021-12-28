@@ -8,7 +8,7 @@ from events import (
     MatchStartedEvent,
     EventType,
 )
-from fixed_data import Nameable
+from fixed_data import Entities, Entities
 from innings import Innings
 from score import Scoreable
 
@@ -17,9 +17,10 @@ from score import Scoreable
 # eventually I will probably need to create a new MatchContext
 # class, separate from Match
 class Match(Context, Scoreable):
-    def __init__(self, mse: MatchStartedEvent):
+    def __init__(self, mse: MatchStartedEvent, match_engine: "MatchEngine"):
         Context.__init__(self)
         Scoreable.__init__(self)
+        self.match_engine = match_engine
         self.match_id = mse.match_id
         self.start_time = mse.start_time
         self.match_type = mse.match_type
@@ -56,11 +57,11 @@ class Match(Context, Scoreable):
         start_time = util.get_current_time()
         innings_id = self.get_num_innings()  # index innings from 0 not 1
         batting_team = self.fd_registrar.get_fixed_data(
-            Nameable.TEAM, payload["batting_team"]
+            Entities.TEAM, payload["batting_team"]
         )
         bowling_team = [team for team in self.get_teams() if team != batting_team][0]
         opening_bowler = self.fd_registrar.get_fixed_data(
-            Nameable.PLAYER, payload["opening_bowler"]
+            Entities.PLAYER, payload["opening_bowler"]
         )
         ise = InningsStartedEvent(
             innings_id, start_time, batting_team, bowling_team, opening_bowler
@@ -69,7 +70,7 @@ class Match(Context, Scoreable):
         return ise
 
     def on_innings_started(self, ise: InningsStartedEvent):
-        new_innings = Innings(ise)
+        new_innings = Innings(ise, self)
         self.add_innings(new_innings)
         self._child_context = new_innings
 

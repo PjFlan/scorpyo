@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class Nameable(Enum):
+class Entities(Enum):
     PLAYER = 0
     TEAM = 1
 

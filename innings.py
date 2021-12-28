@@ -1,4 +1,5 @@
 import enum
+from typing import Optional
 
 import util
 from context import Context
@@ -10,37 +11,34 @@ from events import (
     BatterInningsStartedEvent,
     EventType,
 )
-from fixed_data import Nameable
+from fixed_data import Entities
 from over import Over
 from player import Player
 from score import Scoreable, Score
 
 
 class Innings(Context, Scoreable):
-    def __init__(self, ise: InningsStartedEvent):
+    def __init__(self, ise: InningsStartedEvent, match: "Match"):
         Context.__init__(self)
         Scoreable.__init__(self)
+        self.match = match
         self.start_time = ise.start_time
         self.innings_id = ise.innings_id
         self.batting_team = ise.batting_team
         self.bowling_team = ise.bowling_team
         batter_one = ise.batting_team.batter_by_position(0)
         batter_two = ise.batting_team.batter_by_position(1)
-        first_over = Over(
-            self.innings_id,
-            0,
-            batter_one,
-            batter_two,
-            ise.opening_bowler,
-        )
-        self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over)
+
+        first_over = Over(0, ise.opening_bowler, self)
         self.overs = [first_over]
-        self.on_strike_innings = batter_innings_one = BatterInnings(batter_one)
-        self.off_strike_innings = batter_innings_two = BatterInnings(batter_two)
-        self.bowler_inningses = [BowlerInnings(ise.opening_bowler, first_over)]
+        self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over, self)
+        self.on_strike_innings = batter_innings_one = BatterInnings(batter_one, self)
+        self.off_strike_innings = batter_innings_two = BatterInnings(batter_two, self)
+        self.bowler_inningses = [self.bowler_innings]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
         self.ball_in_innings_num = 0
         self.ball_in_over_num = 0
+
         self.add_handler(EventType.BALL_COMPLETED, self.handle_ball_completed)
         self.add_handler(
             EventType.BATTER_INNINGS_STARTED, self.handle_batter_innings_started
@@ -49,15 +47,15 @@ class Innings(Context, Scoreable):
             EventType.BATTER_INNINGS_COMPLETED, self.handle_batter_innings_completed
         )
 
-    def get_current_over(self):
+    def get_current_over(self) -> Over:
         return self.overs[-1]
 
-    def get_striker(self):
+    def get_striker(self) -> Optional[Player]:
         if not self.on_strike_innings:
             return None
         return self.on_strike_innings.player
 
-    def get_non_striker(self):
+    def get_non_striker(self) -> Optional[Player]:
         if not self.off_strike_innings:
             return None
         return self.off_strike_innings.player
@@ -90,14 +88,14 @@ class Innings(Context, Scoreable):
         for key in payload:
             if key == "on_strike":
                 on_strike_player = self.fd_registrar.get_fixed_data(
-                    Nameable.PLAYER, payload[key]
+                    Entities.PLAYER, payload[key]
                 )
             elif key == "off_strike":
                 off_strike_player = self.fd_registrar.get_fixed_data(
-                    Nameable.PLAYER, payload[key]
+                    Entities.PLAYER, payload[key]
                 )
             elif key == "bowler":
-                bowler = self.fd_registrar.get_fixed_data(Nameable.PLAYER, payload[key])
+                bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload[key])
             elif key == "dismissal":
                 dismissal_payload = payload[key]
         if dismissal_payload:
@@ -125,7 +123,7 @@ class Innings(Context, Scoreable):
         return bce
 
     def handle_batter_innings_started(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Nameable.PLAYER, payload["batter"])
+        batter = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["batter"])
         if not batter:
             try:
                 batter = self.get_next_batter()
@@ -138,7 +136,7 @@ class Innings(Context, Scoreable):
         return bis
 
     def handle_batter_innings_completed(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Nameable.PLAYER, payload["batter"])
+        batter = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["batter"])
         state = BatterInningsState(payload["reason"])
         bic = BatterInningsCompletedEvent(batter, state)
         self.on_batter_innings_completed(bic)
@@ -181,7 +179,7 @@ class Innings(Context, Scoreable):
                 "batter {existing.batter} has already batted and cannot "
                 "bat again (current state {existing.batting_state})"
             )
-        new_innings = BatterInnings(bis.batter)
+        new_innings = BatterInnings(bis.batter, self)
         self.batter_inningses.append(new_innings)
         if not self.on_strike_innings:
             self.on_strike_innings = new_innings
@@ -221,8 +219,9 @@ class Innings(Context, Scoreable):
 
 
 class BatterInnings(Scoreable):
-    def __init__(self, player: Player):
+    def __init__(self, player: Player, innings: Innings):
         super().__init__()
+        self.innings = innings
         self.player = player
         self.balls = []
         self.dismissal = None
@@ -240,8 +239,9 @@ class BatterInnings(Scoreable):
 
 
 class BowlerInnings(Scoreable):
-    def __init__(self, player: Player, first_over: Over):
+    def __init__(self, player: Player, first_over: Over, innings: Innings):
         super().__init__()
+        self.innings = innings
         self.player = player
         self.overs = [first_over]
         self.balls = []
