@@ -1,4 +1,3 @@
-from events import BallCompletedEvent
 from innings import Innings
 from registrar import FixedDataRegistrar
 

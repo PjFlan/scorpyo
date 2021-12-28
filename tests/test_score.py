@@ -52,7 +52,7 @@ def test_add_score():
     assert score_accumulated.get_extra_runs() == 5
 
 
-def test_runs_scored():
+def test_get_runs_scored():
     score_text = "."
     test_score = score.Score.parse(score_text)
     assert test_score.runs_off_bat == 0

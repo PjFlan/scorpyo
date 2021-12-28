@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from typing import Optional
 
@@ -10,9 +12,11 @@ from events import (
     BatterInningsCompletedEvent,
     BatterInningsStartedEvent,
     EventType,
+    OverCompletedEvent,
+    OverStartedEvent,
 )
 from fixed_data import Entities
-from over import Over
+from over import Over, OverState
 from player import Player
 from score import Scoreable, Score
 
@@ -46,6 +50,8 @@ class Innings(Context, Scoreable):
         self.add_handler(
             EventType.BATTER_INNINGS_COMPLETED, self.handle_batter_innings_completed
         )
+        self.add_handler(EventType.OVER_COMPLETED, self.handle_over_completed)
+        self.add_handler(EventType.OVER_STARTED, self.handle_over_started)
 
     def get_current_over(self) -> Over:
         return self.overs[-1]
@@ -63,6 +69,9 @@ class Innings(Context, Scoreable):
     def get_current_bowler(self) -> Player:
         return self.get_current_over().bowler
 
+    def get_current_bowler_innings(self) -> Optional["BowlerInnings"]:
+        return self.bowler_innings
+
     def get_wickets_down(self) -> int:
         return self._score.get_wickets()
 
@@ -78,6 +87,14 @@ class Innings(Context, Scoreable):
     def get_batter_innings(self, player: Player) -> "BatterInnings":
         batter_innings = find_innings(player, self.batter_inningses)
         return batter_innings
+
+    def get_bowler_innings(self, player: Player) -> "BowlerInnings":
+        bowler_innings = find_innings(player, self.bowler_inningses)
+        return bowler_innings
+
+    def get_over_by_number(self, number: int) -> Over:
+        # number should be indexed from 0
+        return self.overs[number]
 
     def handle_ball_completed(self, payload: dict):
         ball_score = Score.parse(payload["score_text"])
@@ -141,6 +158,47 @@ class Innings(Context, Scoreable):
         bic = BatterInningsCompletedEvent(batter, state)
         self.on_batter_innings_completed(bic)
         return bic
+
+    def handle_over_completed(self, payload: dict):
+        if "bowler" not in payload:
+            raise ValueError("must specify bowler of completed over")
+        bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["bowler"])
+        reason = payload.get("reason")
+        if not reason:
+            raise ValueError(
+                "must provide over completion reason when raising an "
+                "OverCompleted event"
+            )
+        try:
+            reason = OverState(payload["reason"])
+        except KeyError:
+            raise ValueError("invalid over completion reason {reason}")
+        if bowler != self.get_current_bowler():
+            raise ValueError(
+                "OverCompleted event raised for a bowler {bowler} who is "
+                "not the bowler of the most recent over"
+            )
+        oc = OverCompletedEvent(bowler, reason)
+        self.on_over_completed(oc)
+        return oc
+
+    def handle_over_started(self, payload: dict):
+        if "bowler" not in payload:
+            raise ValueError("must specify bowler of new over")
+        bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["bowler"])
+        if bowler not in self.bowling_team:
+            raise ValueError(
+                f"bowler {bowler} does not play for team {self.bowling_team}"
+            )
+        next_over_num = len(self.overs)
+        max_overs_allowed = self.match.get_max_overs()
+        if next_over_num >= max_overs_allowed:
+            raise ValueError(
+                f"innings already has max number of overs {max_overs_allowed}"
+            )
+        os = OverStartedEvent(bowler, next_over_num)
+        self.on_over_started(os)
+        return os
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
@@ -217,6 +275,31 @@ class Innings(Context, Scoreable):
         else:
             self.off_strike_innings = None
 
+    def on_over_completed(self, oc: OverCompletedEvent):
+        self.on_strike_innings, self.off_strike_innings = util.switch_strike(
+            self.on_strike_innings, self.off_strike_innings
+        )
+        self.get_current_over().on_over_completed(oc)
+        self.get_current_bowler_innings().on_over_completed(oc)
+
+    def on_over_started(self, os: OverStartedEvent):
+        if os.bowler == self.get_current_bowler():
+            raise ValueError("bowler {player} cannot bowl two overs in a row")
+        if self.get_current_over().state == OverState.IN_PROGRESS:
+            raise ValueError(
+                "Existing over has not yet completed. Send an "
+                "OverCompleted event before sending an OverStarted event"
+            )
+        new_over = Over(os.over_number, os.bowler, self)
+        self.overs.append(new_over)
+        try:
+            bowler_innings = find_innings(os.bowler, self.bowler_inningses)
+        except ValueError:
+            bowler_innings = BowlerInnings(os.bowler, new_over, self)
+            self.bowler_inningses.append(bowler_innings)
+        self.bowler_innings = bowler_innings
+        bowler_innings.on_over_started(os)
+
 
 class BatterInnings(Scoreable):
     def __init__(self, player: Player, innings: Innings):
@@ -243,20 +326,39 @@ class BowlerInnings(Scoreable):
         super().__init__()
         self.innings = innings
         self.player = player
-        self.overs = [first_over]
-        self.balls = []
+        self._overs = [first_over]
         self.wickets = 0
-
-    def balls_bowled(self):
-        return self._score.valid_deliveries
+        self.overs_completed = 0
 
     def runs_against(self):
         return self._score.runs_off_bat + self._score.get_bowler_extras()
 
+    def get_current_over(self) -> Over:
+        if not self._overs:
+            return None
+        return self._overs[-1]
+
     def on_ball_completed(self, bce: BallCompletedEvent):
+        curr_over = self.get_current_over()
+        if curr_over.get_balls_bowled() == 6 and bce.ball_score.is_valid_delivery():
+            raise ValueError("over has more than 6 legal deliveries")
         super().update_score(bce)
         if bce.dismissal and bce.dismissal.bowler_accredited():
             self.wickets += 1
+
+    def on_over_completed(self, oc: OverCompletedEvent):
+        curr_over = self.get_current_over()
+        if curr_over.get_balls_bowled() < 6 and oc.reason == OverState.COMPLETED:
+            raise ValueError(
+                "over cannot have completed with less than 6 legal "
+                " deliveries bowled unless the innings ended"
+            )
+        self.overs_completed += 1
+
+    # TODO: validate bowler has not bowled more than allowed for this format
+    def on_over_started(self, os: OverStartedEvent):
+        over = self.innings.get_over_by_number(os.over_number)
+        self._overs.append(over)
 
 
 class BatterInningsState(enum.Enum):

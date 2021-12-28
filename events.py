@@ -2,6 +2,7 @@ from enum import Enum
 from typing import NamedTuple
 
 from dismissal import Dismissal
+from over import Over
 from static_data.match import MatchType
 from player import Player
 from score import Score
@@ -53,3 +54,13 @@ class BatterInningsCompletedEvent(NamedTuple):
 
 class BatterInningsStartedEvent(NamedTuple):
     batter: Player
+
+
+class OverCompletedEvent(NamedTuple):
+    bowler: Player
+    reason: "OverState"
+
+
+class OverStartedEvent(NamedTuple):
+    bowler: Player
+    over_number: int

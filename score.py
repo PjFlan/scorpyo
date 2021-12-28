@@ -126,5 +126,11 @@ class Scoreable(abc.ABC):
             return None
         return self._ball_events[-1]
 
-    def runs_scored(self) -> int:
+    def get_runs_scored(self) -> int:
         return self._score.runs_off_bat
+
+    def get_total_runs(self) -> int:
+        return self._score.get_total_runs()
+
+    def get_balls_bowled(self) -> int:
+        return self._score.valid_deliveries
