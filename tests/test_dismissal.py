@@ -33,7 +33,7 @@ def test_caught(mock_innings: Innings, registrar: FixedDataRegistrar):
 
 def test_run_out(mock_innings: Innings, registrar: FixedDataRegistrar):
     thrower = "Callum Donnelly"
-    on_strike_player = mock_innings.get_striker()
+    on_strike_player = mock_innings.striker
     payloads = [
         {
             "score_text": "2W",
@@ -73,7 +73,7 @@ def test_run_out_missing_batter(mock_innings: Innings, registrar: FixedDataRegis
 
 def test_innings_completed_event(mock_innings: Innings, registrar: FixedDataRegistrar):
     payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
-    on_strike_player = mock_innings.get_striker()
+    on_strike_player = mock_innings.striker
     apply_ball_events(payloads, registrar, mock_innings)
     payload = {"batter": on_strike_player.name, "reason": "d"}
     mock_innings.handle_batter_innings_completed(payload)
@@ -84,7 +84,7 @@ def test_innings_completed_event_off_strike(
     mock_innings: Innings, registrar: FixedDataRegistrar
 ):
     thrower = "Callum Donnelly"
-    off_strike_player = mock_innings.get_non_striker()
+    off_strike_player = mock_innings.non_striker
     payloads = [
         {
             "score_text": "1W",
@@ -103,16 +103,16 @@ def test_innings_completed_event_off_strike(
 
 
 def test_new_batter_innings(mock_innings: Innings, registrar: FixedDataRegistrar):
-    prev_on_strike_player = mock_innings.get_striker()
-    off_strike_player = mock_innings.get_non_striker()
+    prev_on_strike_player = mock_innings.striker
+    off_strike_player = mock_innings.non_striker
     payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
     apply_ball_events(payloads, registrar, mock_innings)
     bic_payload = {"batter": prev_on_strike_player.name, "reason": "d"}
     mock_innings.handle_batter_innings_completed(bic_payload)
     bis_payload = {"batter": ""}
     mock_innings.handle_batter_innings_started(bis_payload)
-    assert mock_innings.get_striker() == "Harry Tector"
-    assert mock_innings.get_non_striker() == off_strike_player
+    assert mock_innings.striker == "Harry Tector"
+    assert mock_innings.non_striker == off_strike_player
     prev_batter_innings = mock_innings.get_batter_innings(prev_on_strike_player)
     assert prev_batter_innings.batting_state == BatterInningsState.DISMISSED
 
@@ -120,15 +120,15 @@ def test_new_batter_innings(mock_innings: Innings, registrar: FixedDataRegistrar
 def test_new_batter_innings_explicit(
     mock_innings: Innings, registrar: FixedDataRegistrar
 ):
-    prev_on_strike_player = mock_innings.get_striker()
-    off_strike_player = mock_innings.get_non_striker()
+    prev_on_strike_player = mock_innings.striker
+    off_strike_player = mock_innings.non_striker
     payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
     apply_ball_events(payloads, registrar, mock_innings)
     bic_payload = {"batter": prev_on_strike_player.name, "reason": "d"}
     mock_innings.handle_batter_innings_completed(bic_payload)
     bis_payload = {"batter": "Bobby Gamble"}
     mock_innings.handle_batter_innings_started(bis_payload)
-    assert mock_innings.get_striker() == "Bobby Gamble"
-    assert mock_innings.get_non_striker() == off_strike_player
+    assert mock_innings.striker == "Bobby Gamble"
+    assert mock_innings.non_striker == off_strike_player
     prev_batter_innings = mock_innings.get_batter_innings(prev_on_strike_player)
     assert prev_batter_innings.batting_state == BatterInningsState.DISMISSED

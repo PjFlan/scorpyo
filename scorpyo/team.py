@@ -19,3 +19,6 @@ class Team(FixedData):
 
     def __contains__(self, player: Player):
         return player in self._line_up
+
+    def __len__(self) -> int:
+        return len(self._line_up)

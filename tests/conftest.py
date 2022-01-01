@@ -40,7 +40,7 @@ def registrar():
 
 
 @pytest.fixture()
-def mux(registrar):
+def mock_engine(registrar):
     return MatchEngine()
 
 
@@ -57,4 +57,4 @@ def mock_innings(mock_match, registrar):
     bowler_name = test_players_away[-1]
     payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
     mock_match.handle_innings_started(payload)
-    return mock_match.get_current_innings()
+    return mock_match.current_innings

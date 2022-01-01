@@ -31,24 +31,24 @@ def rotate_bowlers(
 
 
 def test_over_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
-    orig_on_strike = mock_innings.get_striker()
-    orig_off_strike = mock_innings.get_non_striker()
+    orig_on_strike = mock_innings.striker
+    orig_off_strike = mock_innings.non_striker
     payloads = [{"score_text": "1"}] * 6
     apply_ball_events(payloads, registrar, mock_innings)
-    assert mock_innings.get_striker() == orig_on_strike
+    assert mock_innings.striker == orig_on_strike
     oc_payload = {
-        "bowler": mock_innings.get_current_bowler().name,
+        "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
     mock_innings.handle_over_completed(oc_payload)
-    assert mock_innings.get_striker() == orig_off_strike
+    assert mock_innings.striker == orig_off_strike
     assert mock_innings.off_strike_innings.get_runs_scored() == 3
     assert mock_innings.get_runs_scored() == 6
-    assert mock_innings.get_current_over().state == OverState.COMPLETED
-    bowler_innings = mock_innings.get_current_bowler_innings()
+    assert mock_innings.current_over.state == OverState.COMPLETED
+    bowler_innings = mock_innings.current_bowler_innings
     assert bowler_innings.overs_completed == 1
     assert bowler_innings.get_balls_bowled() == 6
-    assert bowler_innings.get_current_over().get_balls_bowled() == 6
+    assert bowler_innings.current_over.get_balls_bowled() == 6
 
 
 # TODO: this is probably too coupled to the dismissal logic
@@ -69,17 +69,17 @@ def test_over_completed_wicket(mock_innings: Innings, registrar: FixedDataRegist
     apply_ball_events(payloads, registrar, mock_innings)
     bic_payload = {"batter": batter_out, "reason": "d"}
     mock_innings.handle_batter_innings_completed(bic_payload)
-    assert mock_innings.get_non_striker() == "Jack Tector"
-    assert mock_innings.get_striker() is None
+    assert mock_innings.non_striker == "Jack Tector"
+    assert mock_innings.striker is None
     bis_payload = {"batter": ""}
     mock_innings.handle_batter_innings_started(bis_payload)
-    assert mock_innings.get_striker() == "Harry Tector"
+    assert mock_innings.striker == "Harry Tector"
     oc_payload = {
-        "bowler": mock_innings.get_current_bowler().name,
+        "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
     mock_innings.handle_over_completed(oc_payload)
-    assert mock_innings.get_striker() == "Jack Tector"
+    assert mock_innings.striker == "Jack Tector"
 
 
 def test_incorrect_get_balls_bowled(
@@ -89,7 +89,7 @@ def test_incorrect_get_balls_bowled(
     apply_ball_events(payloads, registrar, mock_innings)
     with pytest.raises(ValueError):
         oc_payload = {
-            "bowler": mock_innings.get_current_bowler().name,
+            "bowler": mock_innings.current_bowler.name,
             "reason": OverState.COMPLETED.value,
         }
         mock_innings.handle_over_completed(oc_payload)
@@ -101,7 +101,7 @@ def test_incorrect_legals_balls(mock_innings: Innings, registrar: FixedDataRegis
     apply_ball_events(payloads, registrar, mock_innings)
     with pytest.raises(ValueError):
         oc_payload = {
-            "bowler": mock_innings.get_current_bowler().name,
+            "bowler": mock_innings.current_bowler.name,
             "reason": OverState.COMPLETED.value,
         }
         mock_innings.handle_over_completed(oc_payload)
@@ -110,36 +110,36 @@ def test_incorrect_legals_balls(mock_innings: Innings, registrar: FixedDataRegis
 def test_over_started(mock_innings: Innings, registrar: FixedDataRegistrar):
     payloads = [{"score_text": "1"}] * 6
     apply_ball_events(payloads, registrar, mock_innings)
-    prev_bowler = mock_innings.get_current_bowler()
+    prev_bowler = mock_innings.current_bowler
     new_bowler = "JJ Cassidy"
-    assert new_bowler != mock_innings.get_current_bowler()
+    assert new_bowler != mock_innings.current_bowler
     oc_payload = {
-        "bowler": mock_innings.get_current_bowler().name,
+        "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
     mock_innings.handle_over_completed(oc_payload)
     os_payload = {"bowler": new_bowler}
     mock_innings.handle_over_started(os_payload)
-    assert mock_innings.get_current_bowler() == new_bowler
-    assert mock_innings.get_current_bowler_innings().get_balls_bowled() == 0
+    assert mock_innings.current_bowler == new_bowler
+    assert mock_innings.current_bowler_innings.get_balls_bowled() == 0
     prev_over_innings = mock_innings.get_bowler_innings(prev_bowler)
     assert prev_over_innings.player == prev_bowler
     payloads = [{"score_text": "1"}]
     apply_ball_events(payloads, registrar, mock_innings)
-    curr_over_innings = mock_innings.get_current_bowler_innings()
+    curr_over_innings = mock_innings.current_bowler_innings
     assert curr_over_innings.get_balls_bowled() == 1
     assert curr_over_innings.get_total_runs() == 1
     assert prev_over_innings.get_balls_bowled() == 6
-    assert curr_over_innings.get_current_over().get_balls_bowled() == 1
+    assert curr_over_innings.current_over.get_balls_bowled() == 1
 
 
 def test_over_started_same_bowler(mock_innings: Innings, registrar: FixedDataRegistrar):
     payloads = [{"score_text": "1"}] * 6
     apply_ball_events(payloads, registrar, mock_innings)
-    new_bowler = mock_innings.get_current_bowler()
-    assert new_bowler == mock_innings.get_current_bowler()
+    new_bowler = mock_innings.current_bowler
+    assert new_bowler == mock_innings.current_bowler
     oc_payload = {
-        "bowler": mock_innings.get_current_bowler().name,
+        "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
     mock_innings.handle_over_completed(oc_payload)
@@ -153,8 +153,8 @@ def test_over_started_exceeds_limit(
 ):
     # patch this with a larger bowler limit as will test this logic separately
     mock_innings.match.match_type = MatchType(1, 20, 10)
-    max_overs = mock_innings.match.get_max_overs()
-    bowlers = [mock_innings.get_current_bowler().name, "JJ Cassidy"]
+    max_overs = mock_innings.match.max_overs
+    bowlers = [mock_innings.current_bowler.name, "JJ Cassidy"]
     last_bowler_idx = rotate_bowlers(mock_innings, registrar, bowlers, max_overs)
     assert len(mock_innings.overs) == max_overs
     with pytest.raises(ValueError) as exc:
@@ -168,7 +168,7 @@ def test_over_started_bowler_exceeds_limit(
     mock_innings: Innings, registrar: FixedDataRegistrar
 ):
     total_overs = 8
-    bowlers = [mock_innings.get_current_bowler().name, "JJ Cassidy"]
+    bowlers = [mock_innings.current_bowler.name, "JJ Cassidy"]
     last_bowler_idx = rotate_bowlers(mock_innings, registrar, bowlers, total_overs)
     with pytest.raises(ValueError) as exc:
         next_bowler_idx = (last_bowler_idx + 1) % len(bowlers)

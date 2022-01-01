@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 
 class MatchType(NamedTuple):
-    innings: int
+    innings_per_side: int
     overs: int
     bowler_limit: int
 

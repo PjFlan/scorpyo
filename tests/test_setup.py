@@ -25,7 +25,7 @@ def test_unique_id(registrar):
     assert len(all_ids) == num_items
 
 
-def test_new_match(mux, registrar):
+def test_new_match(mock_engine, registrar):
     test_payload = {
         "match_type": "T",
         "home_team": HOME_TEAM,
@@ -34,12 +34,12 @@ def test_new_match(mux, registrar):
         "away_line_up": AWAY_PLAYERS,
     }
     new_match_message = {"event_type": 0, "payload": test_payload}
-    mux.on_event(new_match_message)
-    assert mux.current_match.get_max_overs() == 20
-    assert mux.current_match.home_team.name == HOME_TEAM
+    mock_engine.on_event(new_match_message)
+    assert mock_engine.current_match.max_overs == 20
+    assert mock_engine.current_match.home_team.name == HOME_TEAM
 
 
-def test_new_innings(mux, registrar, mock_match):
+def test_new_innings(registrar, mock_match):
     teams = registrar.get_all_of_type(Entities.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
@@ -47,6 +47,6 @@ def test_new_innings(mux, registrar, mock_match):
     payload = {"batting_team": HOME_TEAM, "opening_bowler": bowler_name}
     mock_match.handle_innings_started(payload)
     assert len(mock_match.match_inningses) == 1
-    current_innings = mock_match.get_current_innings()
+    current_innings = mock_match.current_innings
     assert current_innings.innings_num == 0
-    assert current_innings.get_current_over().over_number == 0
+    assert current_innings.current_over.over_number == 0

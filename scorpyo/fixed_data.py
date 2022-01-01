@@ -16,6 +16,9 @@ class FixedData:
     def __eq__(self, other):
         return self.name == other if hasattr(self, "name") else False
 
+    def __hash__(self):
+        return hash(str(self))
+
     def __repr__(self):
         return self.name
 

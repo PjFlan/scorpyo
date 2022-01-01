@@ -134,3 +134,6 @@ class Scoreable(abc.ABC):
 
     def get_balls_bowled(self) -> int:
         return self._score.valid_deliveries
+
+    def __call__(self):
+        return self._score.get_total_runs()

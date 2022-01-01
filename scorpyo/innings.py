@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Optional
+from typing import Optional, List
 
 import scorpyo.util as util
 from scorpyo.context import Context
@@ -56,36 +56,62 @@ class Innings(Context, Scoreable):
         self.add_handler(EventType.OVER_COMPLETED, self.handle_over_completed)
         self.add_handler(EventType.OVER_STARTED, self.handle_over_started)
 
-    def get_current_over(self) -> Over:
+    @property
+    def current_over(self) -> Over:
         return self.overs[-1]
 
-    def get_striker(self) -> Optional[Player]:
+    @property
+    def striker(self) -> Optional[Player]:
         if not self.on_strike_innings:
             return None
         return self.on_strike_innings.player
 
-    def get_non_striker(self) -> Optional[Player]:
+    @property
+    def non_striker(self) -> Optional[Player]:
         if not self.off_strike_innings:
             return None
         return self.off_strike_innings.player
 
-    def get_current_bowler(self) -> Player:
-        return self.get_current_over().bowler
+    @property
+    def current_bowler(self) -> Player:
+        return self.current_over.bowler
 
-    def get_current_bowler_innings(self) -> Optional["BowlerInnings"]:
+    @property
+    def current_bowler_innings(self) -> Optional["BowlerInnings"]:
         return self.bowler_innings
 
-    def get_wickets_down(self) -> int:
+    @property
+    def wickets_down(self) -> int:
         return self._score.get_wickets()
 
-    def get_next_batter(self) -> Player:
-        num_down = self.get_wickets_down()
+    @property
+    def next_batter(self) -> Player:
+        num_down = self.wickets_down
         next_batter_index = num_down + 1
         try:
             next_batter = self.batting_team.batter_by_position(next_batter_index)
         except IndexError as e:
             raise e
         return next_batter
+
+    @property
+    def yet_to_bat(self) -> List[Player]:
+        players_batted = set(bi.player for bi in self.batter_inningses)
+        all_players = set(self.batting_team.get_line_up())
+        yet_to_bat = set.difference(all_players, players_batted)
+        return list(yet_to_bat)
+
+    @property
+    def num_batters_remaining(self) -> int:
+        num_batters = len(self.batting_team)
+        num_already_batted = len(self.batter_inningses)
+        assert num_batters >= num_already_batted
+        return num_batters - num_already_batted
+
+    @property
+    def active_batter_innings(self) -> List[BatterInnings]:
+        inningses = [i for i in (self.on_strike_innings, self.off_strike_innings) if i]
+        return inningses
 
     def get_batter_innings(self, player: Player) -> "BatterInnings":
         batter_innings = find_innings(player, self.batter_inningses)
@@ -102,9 +128,9 @@ class Innings(Context, Scoreable):
     def handle_ball_completed(self, payload: dict):
         ball_score = Score.parse(payload["score_text"])
         dismissal_payload = dismissal = None
-        on_strike_player = self.get_striker()
-        off_strike_player = self.get_non_striker()
-        bowler = self.get_current_bowler()
+        on_strike_player = self.striker
+        off_strike_player = self.non_striker
+        bowler = self.current_bowler
         for key in payload:
             if key == "on_strike":
                 on_strike_player = self.fd_registrar.get_fixed_data(
@@ -146,7 +172,7 @@ class Innings(Context, Scoreable):
         batter = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["batter"])
         if not batter:
             try:
-                batter = self.get_next_batter()
+                batter = self.next_batter
             except IndexError:
                 raise ValueError(
                     "cannot process new batter innings as there are no players left"
@@ -176,7 +202,7 @@ class Innings(Context, Scoreable):
             reason = OverState(payload["reason"])
         except KeyError:
             raise ValueError("invalid over completion reason {reason}")
-        if bowler != self.get_current_bowler():
+        if bowler != self.current_bowler:
             raise ValueError(
                 "OverCompleted event raised for a bowler {bowler} who is "
                 "not the bowler of the most recent over"
@@ -194,7 +220,7 @@ class Innings(Context, Scoreable):
                 f"bowler {bowler} does not play for team {self.bowling_team}"
             )
         next_over_num = len(self.overs)
-        max_overs_allowed = self.match.get_max_overs()
+        max_overs_allowed = self.match.max_overs
         if next_over_num >= max_overs_allowed:
             raise ValueError(
                 f"innings already has max number of overs {max_overs_allowed}"
@@ -216,7 +242,7 @@ class Innings(Context, Scoreable):
             )
             dismissed_innings.on_dismissal(bce.dismissal)
         self.bowler_innings.on_ball_completed(bce)
-        self.get_current_over().on_ball_completed(bce)
+        self.current_over.on_ball_completed(bce)
         if bce.players_crossed:
             self.on_strike_innings, self.off_strike_innings = util.switch_strike(
                 self.on_strike_innings, self.off_strike_innings
@@ -282,13 +308,13 @@ class Innings(Context, Scoreable):
         self.on_strike_innings, self.off_strike_innings = util.switch_strike(
             self.on_strike_innings, self.off_strike_innings
         )
-        self.get_current_over().on_over_completed(oc)
-        self.get_current_bowler_innings().on_over_completed(oc)
+        self.current_over.on_over_completed(oc)
+        self.current_bowler_innings.on_over_completed(oc)
 
     def on_over_started(self, os: OverStartedEvent):
-        if os.bowler == self.get_current_bowler():
+        if os.bowler == self.current_bowler:
             raise ValueError("bowler {player} cannot bowl two overs in a row")
-        if self.get_current_over().state == OverState.IN_PROGRESS:
+        if self.current_over.state == OverState.IN_PROGRESS:
             raise ValueError(
                 "Existing over has not yet completed. Send an "
                 "OverCompleted event before sending an OverStarted event"
@@ -300,7 +326,7 @@ class Innings(Context, Scoreable):
         except ValueError:
             bowler_innings = BowlerInnings(os.bowler, new_over, self)
             self.bowler_inningses.append(bowler_innings)
-        if bowler_innings.overs_completed == self.match.get_max_bowler_overs():
+        if bowler_innings.overs_completed == self.match.max_bowler_overs:
             raise ValueError(
                 f"bowler {os.bowler} has already bowled their full "
                 f"allotment of overs"
@@ -309,11 +335,41 @@ class Innings(Context, Scoreable):
         bowler_innings.on_over_started(os)
 
     def on_innings_completed(self, ice: InningsCompletedEvent):
-        # here we need to do some cleanup of the current bowlers and batsmen
-        # and end there innings appropriately by raising events internally
-        # I can probably put on_innings_completed events on the child objects so that
-        # the logic for how they need to gracefully clean up is internalised
-        pass
+        if ice.reason == InningsState.ALL_OUT:
+            assert len(self.yet_to_bat) == 0, (
+                f"there are still batters remaining so cannot end the "
+                f"innings for reason: {ice.reason}"
+            )
+            assert len(self.active_batter_innings) <= 1, (
+                f"there are still two batters at the crease, so cannot end "
+                f"the innings for reason {ice.reason} without terminating one of the "
+                f"batter inningses first."
+            )
+        if ice.reason == InningsState.OVERS_COMPLETE:
+            assert len(self.overs) == self.match.max_overs, (
+                f"the allotted number of overs has not been bowled so cannot "
+                f"end the innings for reason {ice.reason}"
+            )
+        if ice.reason == InningsState.TARGET_REACHED:
+            if not self.match.target or self.match.target > 0:
+                raise AssertionError(
+                    f"there is either no valid target that can be "
+                    f"reached in this innings or the target has not "
+                    f"been reached, so cannot end the innings for "
+                    f"reason {ice.reason}. target={self.match.target}"
+                )
+        self.state = ice.reason
+        self.end_time = ice.end_time
+        for innings in self.active_batter_innings:
+            # TODO pflanagan: there should be some sort of mechanism for raising
+            #  events internally so that the context objects need not know which
+            #  exact handler to use, and instead the message can flow through the
+            #  natural context hierarchy from top down
+            payload = {
+                "batter": str(innings.player),
+                "reason": BatterInningsState.INNINGS_COMPLETE.value,
+            }
+            self.handle_batter_innings_completed(payload)
 
 
 class BatterInnings(Scoreable):
@@ -348,13 +404,14 @@ class BowlerInnings(Scoreable):
     def runs_against(self):
         return self._score.runs_off_bat + self._score.get_bowler_extras()
 
-    def get_current_over(self) -> Optional[Over]:
+    @property
+    def current_over(self) -> Optional[Over]:
         if not self._overs:
             return None
         return self._overs[-1]
 
     def on_ball_completed(self, bce: BallCompletedEvent):
-        curr_over = self.get_current_over()
+        curr_over = self.current_over
         if curr_over.get_balls_bowled() == 6 and bce.ball_score.is_valid_delivery():
             raise ValueError("over has more than 6 legal deliveries")
         super().update_score(bce)
@@ -362,7 +419,7 @@ class BowlerInnings(Scoreable):
             self.wickets += 1
 
     def on_over_completed(self, oc: OverCompletedEvent):
-        curr_over = self.get_current_over()
+        curr_over = self.current_over
         if curr_over.get_balls_bowled() < 6 and oc.reason == OverState.COMPLETED:
             raise ValueError(
                 "over cannot have completed with less than 6 legal "
@@ -389,7 +446,7 @@ class BatterInningsState(enum.Enum):
     RETIRED_OUT = "ro"
     RETIRED_NOT_OUT = "rno"
     DISMISSED = "d"
-    STRANDED = "s"
+    INNINGS_COMPLETE = "ic"
 
 
 def find_innings(player: Player, inningses: list):
