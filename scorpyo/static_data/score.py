@@ -1,4 +1,4 @@
-from score import Score
+from scorpyo.score import Score
 
 
 BLANK_SCORE = Score(0, 0, 0, 0, 0, 0, 0)

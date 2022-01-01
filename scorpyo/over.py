@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from enum import Enum
 
-from player import Player
-from score import Scoreable
+from scorpyo.player import Player
+from scorpyo.score import Scoreable
 
 
 class OverState(Enum):

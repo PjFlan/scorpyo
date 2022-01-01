@@ -1,9 +1,9 @@
 import functools
 
-from fixed_data import Entities
-from player import Player
-from registrar import FixedDataRegistrar
-from static_data.dismissal import DismissalType
+from scorpyo.fixed_data import Entities
+from scorpyo.player import Player
+from scorpyo.registrar import FixedDataRegistrar
+from scorpyo.static_data.dismissal import DismissalType
 
 
 def parse_dismissal(

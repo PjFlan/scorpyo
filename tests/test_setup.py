@@ -1,6 +1,6 @@
 import itertools
 
-from registrar import FixedDataRegistrar, Entities
+from scorpyo.registrar import FixedDataRegistrar, Entities
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -46,7 +46,7 @@ def test_new_innings(mux, registrar, mock_match):
     bowler_name = AWAY_PLAYERS[-1]
     payload = {"batting_team": HOME_TEAM, "opening_bowler": bowler_name}
     mock_match.handle_innings_started(payload)
-    assert mock_match.get_num_innings() == 1
+    assert len(mock_match.match_inningses) == 1
     current_innings = mock_match.get_current_innings()
-    assert current_innings.innings_id == 0
+    assert current_innings.innings_num == 0
     assert current_innings.get_current_over().over_number == 0

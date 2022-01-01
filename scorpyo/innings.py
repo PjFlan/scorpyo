@@ -3,10 +3,10 @@ from __future__ import annotations
 import enum
 from typing import Optional
 
-import util
-from context import Context
-from dismissal import Dismissal, parse_dismissal
-from events import (
+import scorpyo.util as util
+from scorpyo.context import Context
+from scorpyo.dismissal import Dismissal, parse_dismissal
+from scorpyo.events import (
     BallCompletedEvent,
     InningsStartedEvent,
     BatterInningsCompletedEvent,
@@ -14,11 +14,12 @@ from events import (
     EventType,
     OverCompletedEvent,
     OverStartedEvent,
+    InningsCompletedEvent,
 )
-from fixed_data import Entities
-from over import Over, OverState
-from player import Player
-from score import Scoreable, Score
+from scorpyo.fixed_data import Entities
+from scorpyo.over import Over, OverState
+from scorpyo.player import Player
+from scorpyo.score import Scoreable, Score
 
 
 class Innings(Context, Scoreable):
@@ -27,7 +28,9 @@ class Innings(Context, Scoreable):
         Scoreable.__init__(self)
         self.match = match
         self.start_time = ise.start_time
-        self.innings_id = ise.innings_id
+        self.end_time = None
+        self.innings_num = ise.innings_num
+        self.state = InningsState.IN_PROGRESS
         self.batting_team = ise.batting_team
         self.bowling_team = ise.bowling_team
         batter_one = ise.batting_team.batter_by_position(0)
@@ -297,8 +300,20 @@ class Innings(Context, Scoreable):
         except ValueError:
             bowler_innings = BowlerInnings(os.bowler, new_over, self)
             self.bowler_inningses.append(bowler_innings)
+        if bowler_innings.overs_completed == self.match.get_max_bowler_overs():
+            raise ValueError(
+                f"bowler {os.bowler} has already bowled their full "
+                f"allotment of overs"
+            )
         self.bowler_innings = bowler_innings
         bowler_innings.on_over_started(os)
+
+    def on_innings_completed(self, ice: InningsCompletedEvent):
+        # here we need to do some cleanup of the current bowlers and batsmen
+        # and end there innings appropriately by raising events internally
+        # I can probably put on_innings_completed events on the child objects so that
+        # the logic for how they need to gracefully clean up is internalised
+        pass
 
 
 class BatterInnings(Scoreable):
@@ -333,7 +348,7 @@ class BowlerInnings(Scoreable):
     def runs_against(self):
         return self._score.runs_off_bat + self._score.get_bowler_extras()
 
-    def get_current_over(self) -> Over:
+    def get_current_over(self) -> Optional[Over]:
         if not self._overs:
             return None
         return self._overs[-1]
@@ -361,8 +376,16 @@ class BowlerInnings(Scoreable):
         self._overs.append(over)
 
 
+class InningsState(enum.Enum):
+    IN_PROGRESS = "ip"
+    ALL_OUT = "ao"
+    OVERS_COMPLETE = "oc"
+    DECLARED = "d"
+    TARGET_REACHED = "tr"
+
+
 class BatterInningsState(enum.Enum):
-    IN_PROGRESS = "i"
+    IN_PROGRESS = "ip"
     RETIRED_OUT = "ro"
     RETIRED_NOT_OUT = "rno"
     DISMISSED = "d"

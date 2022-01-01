@@ -1,8 +1,8 @@
 from collections import defaultdict
 
-from fixed_data import Entities
-from player import Player
-from team import Team
+from scorpyo.fixed_data import Entities
+from scorpyo.player import Player
+from scorpyo.team import Team
 
 
 class FixedDataRegistrar:

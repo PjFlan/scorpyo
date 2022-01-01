@@ -1,5 +1,5 @@
-from innings import Innings
-from registrar import FixedDataRegistrar
+from scorpyo.innings import Innings
+from scorpyo.registrar import FixedDataRegistrar
 from .static import HOME_PLAYERS
 from .common import apply_ball_events
 

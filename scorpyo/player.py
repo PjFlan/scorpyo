@@ -1,4 +1,4 @@
-from fixed_data import FixedData
+from scorpyo.fixed_data import FixedData
 
 
 class Player(FixedData):

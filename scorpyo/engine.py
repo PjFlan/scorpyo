@@ -1,12 +1,12 @@
-from context import Context
-from fixed_data import Entities
-from match import Match
-from events import (
+from scorpyo.context import Context
+from scorpyo.fixed_data import Entities
+from scorpyo.match import Match
+from scorpyo.events import (
     EventType,
     MatchStartedEvent,
 )
-import util
-from static_data.match import get_match_type
+import scorpyo.util as util
+from scorpyo.static_data.match import get_match_type
 
 
 class MatchEngine(Context):

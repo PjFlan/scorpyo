@@ -1,5 +1,4 @@
-from events import EventType
-from registrar import FixedDataRegistrar
+from scorpyo.registrar import FixedDataRegistrar
 
 
 class Context:
@@ -9,15 +8,15 @@ class Context:
         self._handlers = {}
         self._child_context = None
 
-    # TODO: fd_registrar should be implemented as a service
+    # TODO pflanagan: fd_registrar should be implemented as a service
     @classmethod
     def set_fd_registrar(cls, fd_registrar: FixedDataRegistrar):
         cls.fd_registrar = fd_registrar
 
-    def add_handler(self, event_type: EventType, func: callable):
+    def add_handler(self, event_type: "EventType", func: callable):
         self._handlers[event_type] = func
 
-    def handle_event(self, event_type: EventType, payload: dict):
+    def handle_event(self, event_type: "EventType", payload: dict):
         handler = self._handlers.get(event_type)
         if handler:
             return handler(payload)

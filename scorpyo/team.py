@@ -1,5 +1,5 @@
-from player import Player
-from fixed_data import FixedData
+from scorpyo.player import Player
+from scorpyo.fixed_data import FixedData
 
 
 class Team(FixedData):

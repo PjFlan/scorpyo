@@ -1,10 +1,10 @@
 import pytest
 
-from context import Context
-from engine import MatchEngine
-from match import Match
-from registrar import FixedDataRegistrar, Entities
-import static_data.match as match
+from scorpyo.context import Context
+from scorpyo.engine import MatchEngine
+from scorpyo.match import Match
+from scorpyo.registrar import FixedDataRegistrar, Entities
+from scorpyo.static_data import match
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -19,6 +19,7 @@ test_team_away = AWAY_TEAM
 class MockMatch(Match):
     def __init__(self):
         self.match_id = 12345
+        self.innings_completed = 0
         self.match_inningses = []
         self.match_type = match.TWENTY_20
 
@@ -44,13 +45,12 @@ def mux(registrar):
 
 
 @pytest.fixture()
-def mock_match():
+def mock_match(registrar):
     return MockMatch()
 
 
 @pytest.fixture()
-def mock_innings(registrar):
-    mock_match = MockMatch()
+def mock_innings(mock_match, registrar):
     teams = registrar.get_all_of_type(Entities.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]

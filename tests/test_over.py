@@ -1,9 +1,33 @@
+from typing import List
+
 import pytest
 
-from innings import Innings
-from over import OverState
-from registrar import FixedDataRegistrar
+from scorpyo.innings import Innings
+from scorpyo.over import OverState
+from scorpyo.player import Player
+from scorpyo.registrar import FixedDataRegistrar
+from scorpyo.static_data.match import MatchType
 from tests.common import apply_ball_events
+
+
+def rotate_bowlers(
+    mock_innings: Innings,
+    registrar: FixedDataRegistrar,
+    bowlers: List[Player],
+    total_overs: int,
+) -> int:
+    payloads = [{"score_text": "."}] * 6
+    apply_ball_events(payloads, registrar, mock_innings)
+    oc_payload = {"bowler": bowlers[0], "reason": OverState.COMPLETED.value}
+    mock_innings.handle_over_completed(oc_payload)
+    for i in range(1, total_overs):
+        idx = i % len(bowlers)
+        os_payload = {"bowler": bowlers[idx]}
+        mock_innings.handle_over_started(os_payload)
+        apply_ball_events(payloads, registrar, mock_innings)
+        oc_payload = {"bowler": bowlers[idx], "reason": OverState.COMPLETED.value}
+        mock_innings.handle_over_completed(oc_payload)
+    return idx
 
 
 def test_over_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
@@ -124,22 +148,30 @@ def test_over_started_same_bowler(mock_innings: Innings, registrar: FixedDataReg
         mock_innings.handle_over_started(os_payload)
 
 
-def test_over_started_over_limit(mock_innings: Innings, registrar: FixedDataRegistrar):
+def test_over_started_exceeds_limit(
+    mock_innings: Innings, registrar: FixedDataRegistrar
+):
+    # patch this with a larger bowler limit as will test this logic separately
+    mock_innings.match.match_type = MatchType(1, 20, 10)
     max_overs = mock_innings.match.get_max_overs()
     bowlers = [mock_innings.get_current_bowler().name, "JJ Cassidy"]
-    payloads = [{"score_text": "1"}] * 6
-    apply_ball_events(payloads, registrar, mock_innings)
-    oc_payload = {"bowler": bowlers[0], "reason": OverState.COMPLETED.value}
-    mock_innings.handle_over_completed(oc_payload)
-    for i in range(1, max_overs):
-        idx = i % 2
-        os_payload = {"bowler": bowlers[idx]}
-        mock_innings.handle_over_started(os_payload)
-        apply_ball_events(payloads, registrar, mock_innings)
-        oc_payload = {"bowler": bowlers[idx], "reason": OverState.COMPLETED.value}
-        mock_innings.handle_over_completed(oc_payload)
+    last_bowler_idx = rotate_bowlers(mock_innings, registrar, bowlers, max_overs)
     assert len(mock_innings.overs) == max_overs
     with pytest.raises(ValueError) as exc:
-        os_payload = {"bowler": bowlers[idx - 1]}
+        next_bowler_idx = (last_bowler_idx + 1) % len(bowlers)
+        os_payload = {"bowler": bowlers[next_bowler_idx]}
         mock_innings.handle_over_started(os_payload)
         assert exc.value == f"innings already has max number of overs {max_overs}"
+
+
+def test_over_started_bowler_exceeds_limit(
+    mock_innings: Innings, registrar: FixedDataRegistrar
+):
+    total_overs = 8
+    bowlers = [mock_innings.get_current_bowler().name, "JJ Cassidy"]
+    last_bowler_idx = rotate_bowlers(mock_innings, registrar, bowlers, total_overs)
+    with pytest.raises(ValueError) as exc:
+        next_bowler_idx = (last_bowler_idx + 1) % len(bowlers)
+        os_payload = {"bowler": bowlers[next_bowler_idx]}
+        mock_innings.handle_over_started(os_payload)
+        assert exc.match(r"has already bowled their full allotment of overs")

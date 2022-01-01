@@ -1,7 +1,7 @@
 import pytest
 
-from innings import Innings, BatterInningsState
-from registrar import FixedDataRegistrar
+from scorpyo.innings import Innings, BatterInningsState
+from scorpyo.registrar import FixedDataRegistrar
 from .common import apply_ball_events
 
 

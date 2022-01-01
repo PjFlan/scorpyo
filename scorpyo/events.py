@@ -1,12 +1,11 @@
 from enum import Enum
 from typing import NamedTuple
 
-from dismissal import Dismissal
-from over import Over
-from static_data.match import MatchType
-from player import Player
-from score import Score
-from team import Team
+from scorpyo.dismissal import Dismissal
+from scorpyo.static_data.match import MatchType
+from scorpyo.player import Player
+from scorpyo.score import Score
+from scorpyo.team import Team
 
 
 class EventType(Enum):
@@ -31,11 +30,17 @@ class MatchStartedEvent(NamedTuple):
 
 
 class InningsStartedEvent(NamedTuple):
-    innings_id: int
+    innings_num: int
     start_time: float
     batting_team: Team
     bowling_team: Team
     opening_bowler: Player
+
+
+class InningsCompletedEvent(NamedTuple):
+    innings_num: int
+    end_time: float
+    reason: "InningsState"
 
 
 class BallCompletedEvent(NamedTuple):
