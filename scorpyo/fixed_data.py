@@ -2,7 +2,7 @@ from collections import Sequence
 from enum import Enum
 
 
-class Entities(Enum):
+class Entity(Enum):
     PLAYER = 0
     TEAM = 1
 

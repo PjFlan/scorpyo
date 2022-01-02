@@ -1,6 +1,6 @@
 import functools
 
-from scorpyo.fixed_data import Entities
+from scorpyo.fixed_data import Entity
 from scorpyo.player import Player
 from scorpyo.registrar import FixedDataRegistrar
 from scorpyo.static_data.dismissal import DismissalType
@@ -18,7 +18,7 @@ def parse_dismissal(
         raise ValueError(f"dismissal type {dt} should not specify a bowler")
     if not dt.batter_implied and "batter" not in payload:
         raise ValueError(f"dismissal type {dt} must specify batter")
-    player_getter = functools.partial(registrar.get_fixed_data, Entities.PLAYER)
+    player_getter = functools.partial(registrar.get_fixed_data, Entity.PLAYER)
     payload_batter = player_getter(payload.get("batter"))
     payload_bowler = player_getter(payload.get("bowler"))
     fielder = player_getter(payload.get("fielder"))

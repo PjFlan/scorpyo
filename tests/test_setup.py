@@ -1,6 +1,6 @@
 import itertools
 
-from scorpyo.registrar import FixedDataRegistrar, Entities
+from scorpyo.registrar import FixedDataRegistrar, Entity
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -12,8 +12,8 @@ def test_registrar():
     for name in test_names:
         line_up.append(registrar.create_player(name))
     team_one = registrar.create_team(test_team_home, line_up)
-    assert line_up[0] is registrar.get_fixed_data(Entities.PLAYER, test_names[0])
-    assert team_one is registrar.get_fixed_data(Entities.TEAM, test_team_home)
+    assert line_up[0] is registrar.get_fixed_data(Entity.PLAYER, test_names[0])
+    assert team_one is registrar.get_fixed_data(Entity.TEAM, test_team_home)
 
 
 def test_unique_id(registrar):
@@ -40,7 +40,7 @@ def test_new_match(mock_engine, registrar):
 
 
 def test_new_innings(registrar, mock_match):
-    teams = registrar.get_all_of_type(Entities.TEAM)
+    teams = registrar.get_all_of_type(Entity.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = AWAY_PLAYERS[-1]

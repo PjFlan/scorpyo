@@ -16,7 +16,7 @@ from scorpyo.events import (
     OverStartedEvent,
     InningsCompletedEvent,
 )
-from scorpyo.fixed_data import Entities
+from scorpyo.fixed_data import Entity
 from scorpyo.over import Over, OverState
 from scorpyo.player import Player
 from scorpyo.score import Scoreable, Score
@@ -138,14 +138,14 @@ class Innings(Context, Scoreable):
         for key in payload:
             if key == "on_strike":
                 on_strike_player = self.fd_registrar.get_fixed_data(
-                    Entities.PLAYER, payload[key]
+                    Entity.PLAYER, payload[key]
                 )
             elif key == "off_strike":
                 off_strike_player = self.fd_registrar.get_fixed_data(
-                    Entities.PLAYER, payload[key]
+                    Entity.PLAYER, payload[key]
                 )
             elif key == "bowler":
-                bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload[key])
+                bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload[key])
             elif key == "dismissal":
                 dismissal_payload = payload[key]
         if dismissal_payload:
@@ -173,7 +173,7 @@ class Innings(Context, Scoreable):
         return bce
 
     def handle_batter_innings_started(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["batter"])
+        batter = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["batter"])
         if not batter:
             try:
                 batter = self.next_batter
@@ -186,7 +186,7 @@ class Innings(Context, Scoreable):
         return bis
 
     def handle_batter_innings_completed(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["batter"])
+        batter = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["batter"])
         state = BatterInningsState(payload["reason"])
         bic = BatterInningsCompletedEvent(batter, state)
         self.on_batter_innings_completed(bic)
@@ -195,7 +195,7 @@ class Innings(Context, Scoreable):
     def handle_over_completed(self, payload: dict):
         if "bowler" not in payload:
             raise ValueError("must specify bowler of completed over")
-        bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["bowler"])
+        bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["bowler"])
         reason = payload.get("reason")
         if not reason:
             raise ValueError(
@@ -218,7 +218,7 @@ class Innings(Context, Scoreable):
     def handle_over_started(self, payload: dict):
         if "bowler" not in payload:
             raise ValueError("must specify bowler of new over")
-        bowler = self.fd_registrar.get_fixed_data(Entities.PLAYER, payload["bowler"])
+        bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["bowler"])
         if bowler not in self.bowling_team:
             raise ValueError(
                 f"bowler {bowler} does not play for team {self.bowling_team}"

@@ -8,7 +8,7 @@ from scorpyo.innings import find_innings, BatterInningsState
 from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.player import Player
-from scorpyo.registrar import FixedDataRegistrar, Entities
+from scorpyo.registrar import FixedDataRegistrar, Entity
 from scorpyo.static_data import match
 from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
@@ -24,7 +24,7 @@ test_team_away = AWAY_TEAM
 class MockMatch(Match):
     def __init__(self):
         self.match_id = 12345
-        self.innings_completed = 0
+        self.num_innings_completed = 0
         self.match_inningses = []
         self.match_type = match.TWENTY_20
 
@@ -95,7 +95,7 @@ def mock_match(registrar):
 
 @pytest.fixture()
 def mock_innings(mock_match, registrar):
-    teams = registrar.get_all_of_type(Entities.TEAM)
+    teams = registrar.get_all_of_type(Entity.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]

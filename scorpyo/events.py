@@ -29,6 +29,12 @@ class MatchStartedEvent(NamedTuple):
     away_team: Team
 
 
+class MatchCompletedEvent(NamedTuple):
+    match_id: int
+    end_time: float
+    reason: "MatchState"
+
+
 class InningsStartedEvent(NamedTuple):
     innings_num: int
     start_time: float

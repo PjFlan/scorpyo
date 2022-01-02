@@ -1,3 +1,4 @@
+import enum
 from typing import Optional, List
 
 import scorpyo.util as util
@@ -11,7 +12,7 @@ from scorpyo.events import (
     EventType,
     InningsCompletedEvent,
 )
-from scorpyo.fixed_data import Entities
+from scorpyo.fixed_data import Entity
 from scorpyo.innings import Innings, InningsState
 from scorpyo.score import Scoreable
 from scorpyo.team import Team
@@ -31,7 +32,7 @@ class Match(Context, Scoreable):
         self.home_team = mse.home_team
         self.away_team = mse.away_team
         self.match_inningses = []
-        self.innings_completed = 0
+        self.num_innings_completed = 0
 
         self.add_handler(EventType.INNINGS_STARTED, self.handle_innings_started)
         self.add_handler(EventType.INNINGS_COMPLETED, self.handle_innings_completed)
@@ -99,13 +100,13 @@ class Match(Context, Scoreable):
     def handle_innings_started(self, payload: dict):
         start_time = util.get_current_time()
         # index innings from 0 not 1
-        innings_num = self.innings_completed
+        innings_num = self.num_innings_completed
         batting_team = self.fd_registrar.get_fixed_data(
-            Entities.TEAM, payload["batting_team"]
+            Entity.TEAM, payload["batting_team"]
         )
         bowling_team = [team for team in self.teams if team != batting_team][0]
         opening_bowler = self.fd_registrar.get_fixed_data(
-            Entities.PLAYER, payload["opening_bowler"]
+            Entity.PLAYER, payload["opening_bowler"]
         )
         ise = InningsStartedEvent(
             innings_num, start_time, batting_team, bowling_team, opening_bowler
@@ -142,7 +143,7 @@ class Match(Context, Scoreable):
                 f"the innings number of the InningsCompletedEvent does "
                 f"not match the current_innings number"
             )
-        self.innings_completed += 1
+        self.num_innings_completed += 1
         self.current_innings.on_innings_completed(ice)
 
     def on_ball_completed(self, bce: BallCompletedEvent):
@@ -154,3 +155,8 @@ class Match(Context, Scoreable):
 
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
         self.current_innings.on_batter_innings_started(bis)
+
+
+class MatchState(enum.Enum):
+    COMPLETED = 0
+    RAINED_OFF = 1

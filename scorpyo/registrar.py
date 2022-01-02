@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from scorpyo.fixed_data import Entities
+from scorpyo.fixed_data import Entity
 from scorpyo.player import Player
 from scorpyo.team import Team
 
@@ -10,7 +10,7 @@ class FixedDataRegistrar:
         self._store = defaultdict(list)
         self._id_counter = 0
 
-    def get_fixed_data(self, object_type: Entities, item_reference: any):
+    def get_fixed_data(self, object_type: Entity, item_reference: any):
         if not item_reference:
             return
         search_list = self._store[object_type]
@@ -22,20 +22,20 @@ class FixedDataRegistrar:
 
     def create_player(self, name: str):
         new_player = Player(self._id_counter, name)
-        self._store[Entities.PLAYER].append(new_player)
+        self._store[Entity.PLAYER].append(new_player)
         self._id_counter += 1
         return new_player
 
     def create_team(self, name: str, line_up: list[Player]):
         new_team = Team(self._id_counter, name, line_up)
-        self._store[Entities.TEAM].append(new_team)
+        self._store[Entity.TEAM].append(new_team)
         self._id_counter += 1
         return new_team
 
-    def get_all_of_type(self, fd_type: Entities):
+    def get_all_of_type(self, fd_type: Entity):
         return self._store[fd_type]
 
-    def get_from_names(self, fd_type: Entities, names: list[str]):
+    def get_from_names(self, fd_type: Entity, names: list[str]):
         fixed_data_items = []
         for name in names:
             fixed_data_items.append(self.get_fixed_data(fd_type, name))
