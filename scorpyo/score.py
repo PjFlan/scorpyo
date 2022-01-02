@@ -26,6 +26,29 @@ class Score:
         self.valid_deliveries = 0
         self.wide_deliveries = 0
 
+    @property
+    def ran_runs(self):
+        return self.runs_off_bat + self.byes + self.leg_byes
+
+    @property
+    def total_runs(self):
+        return (
+            self.runs_off_bat
+            + self.wide_runs
+            + self.leg_byes
+            + self.byes
+            + self.penalty_runs
+            + self.no_ball_runs
+        )
+
+    @property
+    def extra_runs(self):
+        return self.leg_byes + self.byes + self.wide_runs + self.no_ball_runs
+
+    @property
+    def bowler_extras(self):
+        return self.wide_runs + self.no_ball_runs + self.penalty_runs
+
     @classmethod
     def from_tuple(cls, *args):
         new_score = cls(*args)
@@ -85,28 +108,6 @@ class Score:
         self.wickets += new_score.wickets
         return self
 
-    def get_ran_runs(self):
-        return self.runs_off_bat + self.byes + self.leg_byes
-
-    def get_total_runs(self):
-        return (
-            self.runs_off_bat
-            + self.wide_runs
-            + self.leg_byes
-            + self.byes
-            + self.penalty_runs
-            + self.no_ball_runs
-        )
-
-    def get_extra_runs(self):
-        return self.leg_byes + self.byes + self.wide_runs + self.no_ball_runs
-
-    def get_bowler_extras(self):
-        return self.wide_runs + self.no_ball_runs + self.penalty_runs
-
-    def get_wickets(self):
-        return self.wickets
-
 
 class Scoreable(abc.ABC):
     def __init__(self):
@@ -121,19 +122,23 @@ class Scoreable(abc.ABC):
         self._ball_events.append(bce)
         self._score.add(bce.ball_score)
 
-    def get_previous_ball(self):
+    @property
+    def previous_ball(self):
         if len(self._ball_events) == 0:
             return None
         return self._ball_events[-1]
 
-    def get_runs_scored(self) -> int:
+    @property
+    def runs_scored(self) -> int:
         return self._score.runs_off_bat
 
-    def get_total_runs(self) -> int:
-        return self._score.get_total_runs()
+    @property
+    def total_runs(self) -> int:
+        return self._score.total_runs
 
-    def get_balls_bowled(self) -> int:
+    @property
+    def balls_bowled(self) -> int:
         return self._score.valid_deliveries
 
     def __call__(self):
-        return self._score.get_total_runs()
+        return self._score.total_runs

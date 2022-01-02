@@ -27,7 +27,7 @@ def test_caught(mock_innings: Innings, registrar: FixedDataRegistrar):
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.bowler_innings.wickets == 1
     assert mock_innings.on_strike_innings.batting_state == BatterInningsState.DISMISSED
-    prev_ball = mock_innings.get_previous_ball()
+    prev_ball = mock_innings.previous_ball
     assert prev_ball.dismissal.fielder == catcher
 
 
@@ -50,8 +50,8 @@ def test_run_out(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert (
         mock_innings.off_strike_innings.batting_state == BatterInningsState.IN_PROGRESS
     )
-    assert mock_innings.on_strike_innings.get_runs_scored() == 2
-    prev_ball = mock_innings.get_previous_ball()
+    assert mock_innings.on_strike_innings.runs_scored == 2
+    prev_ball = mock_innings.previous_ball
     assert prev_ball.dismissal.fielder == thrower
 
 
@@ -98,7 +98,7 @@ def test_innings_completed_event_off_strike(
     apply_ball_events(payloads, registrar, mock_innings)
     payload = {"batter": off_strike_player.name, "reason": "d"}
     mock_innings.handle_batter_innings_completed(payload)
-    assert mock_innings.off_strike_innings.get_runs_scored() == 1
+    assert mock_innings.off_strike_innings.runs_scored == 1
     assert mock_innings.on_strike_innings is None
 
 

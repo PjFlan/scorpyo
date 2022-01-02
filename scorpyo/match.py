@@ -60,19 +60,20 @@ class Match(Context, Scoreable):
 
     @property
     def target(self) -> int:
+        # TODO pflanagan: cover this in unit tests
         num_innings_played = len(self.match_inningses)
         if self.match_type.innings_per_side == 1:
             if num_innings_played == 0:
                 return None
             else:
-                return self.match_inningses[0]()
+                return self.match_inningses[0]() + 1
         elif num_innings_played <= 3:
             return None
         batting_first_inn_runs = self.get_team_runs(
             self.current_innings.batting_team, 0
         )
         bowling_total_runs = self.get_team_runs(self.current_innings.bowling_team)
-        return max(0, bowling_total_runs - batting_first_inn_runs)
+        return max(0, bowling_total_runs + 1 - batting_first_inn_runs)
 
     def get_team_runs(self, team: Team, innings_filter=None):
         runs = 0

@@ -47,12 +47,12 @@ def test_add_score():
     score_accumulated = score_one.add(score_two)
     score_accumulated.add(score_three)
     score_accumulated.add(score_four)
-    assert score_accumulated.get_total_runs() == 9
-    assert score_accumulated.get_ran_runs() == 6
-    assert score_accumulated.get_extra_runs() == 5
+    assert score_accumulated.total_runs == 9
+    assert score_accumulated.ran_runs == 6
+    assert score_accumulated.extra_runs == 5
 
 
-def test_get_runs_scored():
+def test_runs_scored():
     score_text = "."
     test_score = score.Score.parse(score_text)
     assert test_score.runs_off_bat == 0

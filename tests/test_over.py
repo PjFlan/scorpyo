@@ -42,13 +42,13 @@ def test_over_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
     }
     mock_innings.handle_over_completed(oc_payload)
     assert mock_innings.striker == orig_off_strike
-    assert mock_innings.off_strike_innings.get_runs_scored() == 3
-    assert mock_innings.get_runs_scored() == 6
+    assert mock_innings.off_strike_innings.runs_scored == 3
+    assert mock_innings.runs_scored == 6
     assert mock_innings.current_over.state == OverState.COMPLETED
     bowler_innings = mock_innings.current_bowler_innings
     assert bowler_innings.overs_completed == 1
-    assert bowler_innings.get_balls_bowled() == 6
-    assert bowler_innings.current_over.get_balls_bowled() == 6
+    assert bowler_innings.balls_bowled == 6
+    assert bowler_innings.current_over.balls_bowled == 6
 
 
 # TODO: this is probably too coupled to the dismissal logic
@@ -121,16 +121,16 @@ def test_over_started(mock_innings: Innings, registrar: FixedDataRegistrar):
     os_payload = {"bowler": new_bowler}
     mock_innings.handle_over_started(os_payload)
     assert mock_innings.current_bowler == new_bowler
-    assert mock_innings.current_bowler_innings.get_balls_bowled() == 0
+    assert mock_innings.current_bowler_innings.balls_bowled == 0
     prev_over_innings = mock_innings.get_bowler_innings(prev_bowler)
     assert prev_over_innings.player == prev_bowler
     payloads = [{"score_text": "1"}]
     apply_ball_events(payloads, registrar, mock_innings)
     curr_over_innings = mock_innings.current_bowler_innings
-    assert curr_over_innings.get_balls_bowled() == 1
-    assert curr_over_innings.get_total_runs() == 1
-    assert prev_over_innings.get_balls_bowled() == 6
-    assert curr_over_innings.current_over.get_balls_bowled() == 1
+    assert curr_over_innings.balls_bowled == 1
+    assert curr_over_innings.total_runs == 1
+    assert prev_over_innings.balls_bowled == 6
+    assert curr_over_innings.current_over.balls_bowled == 1
 
 
 def test_over_started_same_bowler(mock_innings: Innings, registrar: FixedDataRegistrar):

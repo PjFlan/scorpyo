@@ -1,3 +1,4 @@
+from collections import Sequence
 from enum import Enum
 
 

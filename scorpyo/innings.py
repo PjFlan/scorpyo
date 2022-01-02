@@ -33,8 +33,8 @@ class Innings(Context, Scoreable):
         self.state = InningsState.IN_PROGRESS
         self.batting_team = ise.batting_team
         self.bowling_team = ise.bowling_team
-        batter_one = ise.batting_team.batter_by_position(0)
-        batter_two = ise.batting_team.batter_by_position(1)
+        batter_one = ise.batting_team[0]
+        batter_two = ise.batting_team[1]
 
         first_over = Over(0, ise.opening_bowler, self)
         self.overs = [first_over]
@@ -82,14 +82,14 @@ class Innings(Context, Scoreable):
 
     @property
     def wickets_down(self) -> int:
-        return self._score.get_wickets()
+        return self._score.wickets
 
     @property
     def next_batter(self) -> Player:
         num_down = self.wickets_down
         next_batter_index = num_down + 1
         try:
-            next_batter = self.batting_team.batter_by_position(next_batter_index)
+            next_batter = self.batting_team[next_batter_index]
         except IndexError as e:
             raise e
         return next_batter
@@ -110,7 +110,11 @@ class Innings(Context, Scoreable):
 
     @property
     def active_batter_innings(self) -> List[BatterInnings]:
-        inningses = [i for i in (self.on_strike_innings, self.off_strike_innings) if i]
+        inningses = [
+            i
+            for i in (self.on_strike_innings, self.off_strike_innings)
+            if i and i.batting_state == BatterInningsState.IN_PROGRESS
+        ]
         return inningses
 
     def get_batter_innings(self, player: Player) -> "BatterInnings":
@@ -155,7 +159,7 @@ class Innings(Context, Scoreable):
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
             players_crossed = True
-        elif ball_score.get_ran_runs() % 2 == 1:
+        elif ball_score.ran_runs % 2 == 1:
             players_crossed = True
         bce = BallCompletedEvent(
             on_strike_player,
@@ -280,7 +284,7 @@ class Innings(Context, Scoreable):
             )
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
         if bic.batting_state == BatterInningsState.DISMISSED:
-            prev_dismissal = self.get_previous_ball().dismissal
+            prev_dismissal = self.previous_ball.dismissal
             if not prev_dismissal:
                 raise ValueError(
                     "inconsistent state: batter innings completed via "
@@ -351,12 +355,13 @@ class Innings(Context, Scoreable):
                 f"end the innings for reason {ice.reason}"
             )
         if ice.reason == InningsState.TARGET_REACHED:
-            if not self.match.target or self.match.target > 0:
+            if not self.match.target or self.total_runs < self.match.target:
                 raise AssertionError(
                     f"there is either no valid target that can be "
                     f"reached in this innings or the target has not "
                     f"been reached, so cannot end the innings for "
-                    f"reason {ice.reason}. target={self.match.target}"
+                    f"reason {ice.reason}. target={self.match.target} current_score="
+                    f"{self.total_runs}"
                 )
         self.state = ice.reason
         self.end_time = ice.end_time
@@ -402,7 +407,7 @@ class BowlerInnings(Scoreable):
         self.overs_completed = 0
 
     def runs_against(self):
-        return self._score.runs_off_bat + self._score.get_bowler_extras()
+        return self._score.runs_off_bat + self._score.bowler_extras
 
     @property
     def current_over(self) -> Optional[Over]:
@@ -412,7 +417,7 @@ class BowlerInnings(Scoreable):
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         curr_over = self.current_over
-        if curr_over.get_balls_bowled() == 6 and bce.ball_score.is_valid_delivery():
+        if curr_over.balls_bowled == 6 and bce.ball_score.is_valid_delivery():
             raise ValueError("over has more than 6 legal deliveries")
         super().update_score(bce)
         if bce.dismissal and bce.dismissal.bowler_accredited():
@@ -420,14 +425,13 @@ class BowlerInnings(Scoreable):
 
     def on_over_completed(self, oc: OverCompletedEvent):
         curr_over = self.current_over
-        if curr_over.get_balls_bowled() < 6 and oc.reason == OverState.COMPLETED:
+        if curr_over.balls_bowled < 6 and oc.reason == OverState.COMPLETED:
             raise ValueError(
                 "over cannot have completed with less than 6 legal "
                 " deliveries bowled unless the innings ended"
             )
         self.overs_completed += 1
 
-    # TODO: validate bowler has not bowled more than allowed for this format
     def on_over_started(self, os: OverStartedEvent):
         over = self.innings.get_over_by_number(os.over_number)
         self._overs.append(over)
