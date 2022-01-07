@@ -8,9 +8,9 @@ from scorpyo.innings import find_innings, BatterInningsState
 from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.player import Player
-from scorpyo.registrar import FixedDataRegistrar, Entity
+from scorpyo.registrar import EntityRegistrar, EntityType
 from scorpyo.static_data import match
-from .static import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
+from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 # TODO: maybe these player names should be enums
@@ -50,16 +50,22 @@ class MockMatch(Match):
             next_over.bowler = bowler
             self.current_innings.overs.append(next_over)
             next_over.state = OverState.COMPLETED
+            next_over.over_number = prev_over.over_number + 1
         else:
             payload = {"score_text": "."}
             self.current_innings.current_over.bowler = bowler
             for _ in range(6):
                 self.current_innings.handle_ball_completed(payload)
-            oc_payload = {"bowler": bowler.name, "reason": OverState.COMPLETED}
+            oc_payload = {
+                "over_num": 0,
+                "bowler": bowler.name,
+                "reason": OverState.COMPLETED,
+            }
             self.current_innings.handle_over_completed(oc_payload)
 
     def apply_overs(self, num_overs) -> Player:
         bowling_team = self.current_innings.bowling_team
+        next_idx = 0
         for over in range(num_overs):
             next_idx = over % len(bowling_team)
             next_bowler = bowling_team[next_idx]
@@ -70,7 +76,7 @@ class MockMatch(Match):
 
 @pytest.fixture()
 def registrar():
-    registrar = FixedDataRegistrar()
+    registrar = EntityRegistrar()
     line_up_home = []
     line_up_away = []
     for name in test_players_home:
@@ -79,7 +85,7 @@ def registrar():
         line_up_away.append(registrar.create_player(name))
     registrar.create_team(test_team_home, line_up_home)
     registrar.create_team(test_team_away, line_up_away)
-    Context.set_fd_registrar(registrar)
+    Context.set_entity_registrar(registrar)
     return registrar
 
 
@@ -95,7 +101,7 @@ def mock_match(registrar):
 
 @pytest.fixture()
 def mock_innings(mock_match, registrar):
-    teams = registrar.get_all_of_type(Entity.TEAM)
+    teams = registrar.get_all_of_type(EntityType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     bowler_name = test_players_away[-1]

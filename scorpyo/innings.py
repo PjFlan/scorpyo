@@ -16,7 +16,7 @@ from scorpyo.events import (
     OverStartedEvent,
     InningsCompletedEvent,
 )
-from scorpyo.fixed_data import Entity
+from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
 from scorpyo.player import Player
 from scorpyo.score import Scoreable, Score
@@ -137,15 +137,17 @@ class Innings(Context, Scoreable):
         bowler = self.current_bowler
         for key in payload:
             if key == "on_strike":
-                on_strike_player = self.fd_registrar.get_fixed_data(
-                    Entity.PLAYER, payload[key]
+                on_strike_player = self.entity_registrar.get_entity_data(
+                    EntityType.PLAYER, payload[key]
                 )
             elif key == "off_strike":
-                off_strike_player = self.fd_registrar.get_fixed_data(
-                    Entity.PLAYER, payload[key]
+                off_strike_player = self.entity_registrar.get_entity_data(
+                    EntityType.PLAYER, payload[key]
                 )
             elif key == "bowler":
-                bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload[key])
+                bowler = self.entity_registrar.get_entity_data(
+                    EntityType.PLAYER, payload[key]
+                )
             elif key == "dismissal":
                 dismissal_payload = payload[key]
         if dismissal_payload:
@@ -154,7 +156,7 @@ class Innings(Context, Scoreable):
                 on_strike_player,
                 off_strike_player,
                 bowler,
-                self.fd_registrar,
+                self.entity_registrar,
             )
         players_crossed = False
         if ball_score.wide_runs > 0 and ball_score.wide_runs % 2 == 0:
@@ -173,7 +175,9 @@ class Innings(Context, Scoreable):
         return bce
 
     def handle_batter_innings_started(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["batter"])
+        batter = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, payload["batter"]
+        )
         if not batter:
             try:
                 batter = self.next_batter
@@ -186,7 +190,9 @@ class Innings(Context, Scoreable):
         return bis
 
     def handle_batter_innings_completed(self, payload: dict):
-        batter = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["batter"])
+        batter = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, payload["batter"]
+        )
         state = BatterInningsState(payload["reason"])
         bic = BatterInningsCompletedEvent(batter, state)
         self.on_batter_innings_completed(bic)
@@ -195,7 +201,9 @@ class Innings(Context, Scoreable):
     def handle_over_completed(self, payload: dict):
         if "bowler" not in payload:
             raise ValueError("must specify bowler of completed over")
-        bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["bowler"])
+        bowler = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, payload["bowler"]
+        )
         reason = payload.get("reason")
         if not reason:
             raise ValueError(
@@ -211,14 +219,17 @@ class Innings(Context, Scoreable):
                 "OverCompleted event raised for a bowler {bowler} who is "
                 "not the bowler of the most recent over"
             )
-        oc = OverCompletedEvent(bowler, reason)
+        over_number = payload["over_num"]
+        oc = OverCompletedEvent(over_number, bowler, reason)
         self.on_over_completed(oc)
         return oc
 
     def handle_over_started(self, payload: dict):
         if "bowler" not in payload:
             raise ValueError("must specify bowler of new over")
-        bowler = self.fd_registrar.get_fixed_data(Entity.PLAYER, payload["bowler"])
+        bowler = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, payload["bowler"]
+        )
         if bowler not in self.bowling_team:
             raise ValueError(
                 f"bowler {bowler} does not play for team {self.bowling_team}"

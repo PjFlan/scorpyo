@@ -12,7 +12,7 @@ from scorpyo.events import (
     EventType,
     InningsCompletedEvent,
 )
-from scorpyo.fixed_data import Entity
+from scorpyo.entity import EntityType
 from scorpyo.innings import Innings, InningsState
 from scorpyo.score import Scoreable
 from scorpyo.team import Team
@@ -47,7 +47,7 @@ class Match(Context, Scoreable):
 
     @property
     def max_inningses(self) -> int:
-        return self.match_type.innings
+        return self.match_type.innings_per_side
 
     @property
     def teams(self) -> List[Team]:
@@ -60,7 +60,7 @@ class Match(Context, Scoreable):
         return self.match_inningses[-1]
 
     @property
-    def target(self) -> int:
+    def target(self) -> Optional[int]:
         # TODO pflanagan: cover this in unit tests
         num_innings_played = len(self.match_inningses)
         if self.match_type.innings_per_side == 1:
@@ -101,12 +101,12 @@ class Match(Context, Scoreable):
         start_time = util.get_current_time()
         # index innings from 0 not 1
         innings_num = self.num_innings_completed
-        batting_team = self.fd_registrar.get_fixed_data(
-            Entity.TEAM, payload["batting_team"]
+        batting_team = self.entity_registrar.get_entity_data(
+            EntityType.TEAM, payload["batting_team"]
         )
         bowling_team = [team for team in self.teams if team != batting_team][0]
-        opening_bowler = self.fd_registrar.get_fixed_data(
-            Entity.PLAYER, payload["opening_bowler"]
+        opening_bowler = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, payload["opening_bowler"]
         )
         ise = InningsStartedEvent(
             innings_num, start_time, batting_team, bowling_team, opening_bowler
@@ -160,3 +160,4 @@ class Match(Context, Scoreable):
 class MatchState(enum.Enum):
     COMPLETED = 0
     RAINED_OFF = 1
+    IN_PROGRESS = 2

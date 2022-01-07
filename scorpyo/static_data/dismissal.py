@@ -1,3 +1,4 @@
+# TODO pflanagan: I don't like this implementation but fine for now
 class DismissalType:
 
     _dismissals = {}

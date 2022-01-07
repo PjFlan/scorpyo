@@ -1,7 +1,7 @@
-from scorpyo.fixed_data import FixedData
+from scorpyo.entity import Entity
 
 
-class Player(FixedData):
+class Player(Entity):
     def __init__(self, unique_id: int, name: str):
         super().__init__(unique_id, name)
 

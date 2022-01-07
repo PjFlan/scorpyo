@@ -29,4 +29,5 @@ class Over(Scoreable):
         super().update_score(bce)
 
     def on_over_completed(self, oc: "OverCompletedEvent"):
+        assert self.over_number == oc.number, "OverCompletedEvent raised for wrong over"
         self.state = OverState.COMPLETED

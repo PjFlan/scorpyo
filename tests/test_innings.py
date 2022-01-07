@@ -1,13 +1,13 @@
 import pytest
 
 from scorpyo.innings import Innings, InningsState, BatterInningsState
-from scorpyo.registrar import FixedDataRegistrar
+from scorpyo.registrar import EntityRegistrar
 from .conftest import MockMatch
-from .static import HOME_PLAYERS
+from .resources import HOME_PLAYERS
 from .common import apply_ball_events
 
 
-def test_ball_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
+def test_ball_completed(mock_innings: Innings, registrar: EntityRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     event = mock_innings.handle_ball_completed(payload)
@@ -16,7 +16,7 @@ def test_ball_completed(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert mock_innings.on_strike_innings.runs_scored == 0
 
 
-def test_strike_rotates(mock_innings: Innings, registrar: FixedDataRegistrar):
+def test_strike_rotates(mock_innings: Innings, registrar: EntityRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     event = mock_innings.handle_ball_completed(payload)
@@ -35,7 +35,7 @@ def test_strike_rotates(mock_innings: Innings, registrar: FixedDataRegistrar):
     assert mock_innings.striker == expected_on_strike
 
 
-def test_multiple_deliveries(mock_innings: Innings, registrar: FixedDataRegistrar):
+def test_multiple_deliveries(mock_innings: Innings, registrar: EntityRegistrar):
     payloads = [{"score_text": "1"}, {"score_text": "2"}, {"score_text": "."}]
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.off_strike_innings.runs_scored == 1
@@ -43,7 +43,7 @@ def test_multiple_deliveries(mock_innings: Innings, registrar: FixedDataRegistra
     assert mock_innings.bowler_innings.runs_against() == 3
 
 
-def test_balls_faced_bowled(mock_innings: Innings, registrar: FixedDataRegistrar):
+def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):
     payloads = [
         {"score_text": "1"},
         {"score_text": "2"},
@@ -58,7 +58,7 @@ def test_balls_faced_bowled(mock_innings: Innings, registrar: FixedDataRegistrar
 
 
 def test_innings_completed_all_out(
-    mock_match: MockMatch, mock_innings: Innings, registrar: FixedDataRegistrar
+    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
 ):
     # TODO pflanagan: theres a lot of boilerplate here needed to take wickets
     # maybe I should instead patch various methods on my mock class to do this for me
@@ -91,7 +91,7 @@ def test_innings_completed_all_out(
 
 def test_innings_completed_overs_complete(mock_match: MockMatch, mock_innings: Innings):
     next_bowler = mock_match.apply_overs(mock_match.max_overs - 1)
-    payload = {"innings_num": 0, "reason": InningsState.OVERS_COMPLETE}
+    payload = {"over_num": 21, "innings_num": 0, "reason": InningsState.OVERS_COMPLETE}
     with pytest.raises(AssertionError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("the allotted number of overs has not been bowled")

@@ -1,13 +1,12 @@
-from collections import Sequence
 from enum import Enum
 
 
-class Entity(Enum):
+class EntityType(Enum):
     PLAYER = 0
     TEAM = 1
 
 
-class FixedData:
+class Entity:
     name = ""
 
     def __init__(self, unique_id: int, name: str):

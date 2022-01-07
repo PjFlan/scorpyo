@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from typing import List
 
 from scorpyo.player import Player
-from scorpyo.fixed_data import FixedData
+from scorpyo.entity import Entity
 
 
-class Team(FixedData, Sequence):
-    def __init__(self, unique_id: int, name: str, line_up: list[Player]):
+class Team(Entity, Sequence):
+    def __init__(self, unique_id: int, name: str, line_up: List[Player]):
         super().__init__(unique_id, name)
         self._line_up = line_up
         self._is_home_team = False

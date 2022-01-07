@@ -68,6 +68,7 @@ class BatterInningsStartedEvent(NamedTuple):
 
 
 class OverCompletedEvent(NamedTuple):
+    number: int
     bowler: Player
     reason: "OverState"
 

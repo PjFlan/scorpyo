@@ -1,17 +1,17 @@
-from scorpyo.registrar import FixedDataRegistrar
+from scorpyo.registrar import EntityRegistrar
 
 
 class Context:
-    fd_registrar = None
+    entity_registrar = None
 
     def __init__(self):
         self._handlers = {}
         self._child_context = None
 
-    # TODO pflanagan: fd_registrar should be implemented as a service
+    # TODO pflanagan: entity_registrar should be implemented as a service
     @classmethod
-    def set_fd_registrar(cls, fd_registrar: FixedDataRegistrar):
-        cls.fd_registrar = fd_registrar
+    def set_entity_registrar(cls, entity_registrar: EntityRegistrar):
+        cls.entity_registrar = entity_registrar
 
     def add_handler(self, event_type: "EventType", func: callable):
         self._handlers[event_type] = func
