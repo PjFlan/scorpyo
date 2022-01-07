@@ -1,29 +1,12 @@
-# TODO pflanagan: I don't like this implementation but fine for now
-class DismissalType:
+from typing import NamedTuple
 
-    _dismissals = {}
 
-    def __init__(
-        self,
-        name: str,
-        abbrv: str,
-        bowler_accredited: bool,
-        batter_implied: bool,
-        needs_fielder: True,
-    ):
-        self.name = name
-        self.abbrv = abbrv
-        self.bowler_accredited = bowler_accredited
-        self.needs_fielder = needs_fielder
-        self.batter_implied = batter_implied
-        self._dismissals[abbrv] = self
-
-    @classmethod
-    def get_from_abbrv(cls, abbrv: str):
-        return cls._dismissals[abbrv]
-
-    def __str__(self):
-        return self.name
+class DismissalType(NamedTuple):
+    name: str
+    abbrv: str
+    bowler_accredited: bool
+    batter_implied: bool
+    needs_fielder: bool
 
 
 BOWLED = DismissalType("bowled", "b", True, True, False)
@@ -36,3 +19,22 @@ HIT_BALL_TWICE = DismissalType("hit twice", "ht", False, True, False)
 TIMED_OUT = DismissalType("timed out", "to", False, True, False)
 HANDLED_BALL = DismissalType("handled ball", "hb", False, False, False)
 OBSTRUCTING_FIELD = DismissalType("obstructing field", "of", False, False, False)
+
+_dismissal_type = {
+    "b": BOWLED,
+    "ct": CAUGHT,
+    "lbw": LBW,
+    "st": STUMPED,
+    "ro": RUN_OUT,
+    "hw": HIT_WICKET,
+    "ht": HIT_BALL_TWICE,
+    "to": TIMED_OUT,
+    "hb": HANDLED_BALL,
+    "of": OBSTRUCTING_FIELD,
+}
+
+
+def get_dismissal_type(shortcode: str):
+    if shortcode not in _dismissal_type:
+        raise ValueError(f"invalid dismissal type {shortcode}")
+    return _dismissal_type[shortcode]

@@ -3,7 +3,7 @@ import functools
 from scorpyo.entity import EntityType
 from scorpyo.player import Player
 from scorpyo.registrar import EntityRegistrar
-from scorpyo.static_data.dismissal import DismissalType
+from scorpyo.static_data.dismissal import get_dismissal_type, DismissalType
 
 
 def parse_dismissal(
@@ -13,7 +13,7 @@ def parse_dismissal(
     bowler: Player,
     registrar: EntityRegistrar,
 ):
-    dt = DismissalType.get_from_abbrv(payload["type"])
+    dt = get_dismissal_type(payload["type"])
     if not dt.bowler_accredited and "bowler" in payload:
         raise ValueError(f"dismissal type {dt} should not specify a bowler")
     if not dt.batter_implied and "batter" not in payload:

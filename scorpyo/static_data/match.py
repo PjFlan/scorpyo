@@ -14,4 +14,6 @@ _match_types = {"T": TWENTY_20, "O": ONE_DAY}
 
 
 def get_match_type(shortcode: str):
+    if shortcode not in _match_types:
+        raise ValueError(f"invalid match type {shortcode}")
     return _match_types[shortcode]
