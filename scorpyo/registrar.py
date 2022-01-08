@@ -36,11 +36,11 @@ class EntityRegistrar:
     def get_all_of_type(self, entity_type: EntityType):
         return self._store[entity_type]
 
-    def get_from_names(self, sd_type: EntityType, names: list[str]):
-        entity_items = []
+    def get_from_names(self, entity_type: EntityType, names: list[str]):
+        entities = []
         for name in names:
-            entity_items.append(self.get_entity_data(sd_type, name))
-        return entity_items
+            entities.append(self.get_entity_data(entity_type, name))
+        return entities
 
 
 class EventRegistrar:

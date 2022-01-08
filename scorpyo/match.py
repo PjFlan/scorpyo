@@ -28,6 +28,7 @@ class Match(Context, Scoreable):
         self.match_engine = match_engine
         self.match_id = mse.match_id
         self.start_time = mse.start_time
+        self.state = MatchState.IN_PROGRESS
         self.match_type = mse.match_type
         self.home_team = mse.home_team
         self.away_team = mse.away_team
@@ -61,27 +62,52 @@ class Match(Context, Scoreable):
 
     @property
     def target(self) -> Optional[int]:
-        # TODO pflanagan: cover this in unit tests
-        num_innings_played = len(self.match_inningses)
         if self.match_type.innings_per_side == 1:
-            if num_innings_played == 0:
+            if self.num_innings_completed == 0:
                 return None
             else:
                 return self.match_inningses[0]() + 1
-        elif num_innings_played <= 3:
+        elif self.num_innings_completed < 3:
             return None
-        batting_first_inn_runs = self.get_team_runs(
-            self.current_innings.batting_team, 0
-        )
-        bowling_total_runs = self.get_team_runs(self.current_innings.bowling_team)
-        return max(0, bowling_total_runs + 1 - batting_first_inn_runs)
+        if len(self.match_inningses) == 3:
+            # PF: if we have not yet started the 4th innings we need to make sure
+            # we preempt who will be the batting and bowling teams
+            bowling_team = (
+                self.current_innings.batting_team
+                if len(self.match_inningses) == 3
+                else self.current_innings.bowling_team
+            )
+            batting_team = (
+                self.current_innings.bowling_team
+                if len(self.match_inningses) == 3
+                else self.current_innings.bating_team
+            )
+        batting_team_first_inn_runs = self.get_team_runs(batting_team, 0)
+        bowling_team_total_runs = self.get_team_runs(bowling_team)
+        return max(0, bowling_team_total_runs + 1 - batting_team_first_inn_runs)
+
+    @property
+    def runs_to_win(self) -> Optional[int]:
+        if self.target is None:
+            return None
+        if self.target <= 0:
+            return 0
+        if self.match_type.innings_per_side == 2 and len(self.match_inningses) == 3:
+            return self.target
+        return max(0, self.target - self.current_innings.total_runs)
+
+    @property
+    def target_reached(self) -> bool:
+        if self.runs_to_win is None:
+            return False
+        return self.runs_to_win == 0
 
     def get_team_runs(self, team: Team, innings_filter=None):
         runs = 0
         innings_count = 0
         for innings in self.match_inningses:
             if innings.batting_team == team:
-                if innings_filter and innings_count != innings_filter:
+                if innings_filter is not None and innings_count != innings_filter:
                     innings_count += 1
                     continue
                 runs += innings()

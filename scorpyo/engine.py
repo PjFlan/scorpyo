@@ -32,6 +32,12 @@ class MatchEngine(Context):
         self.events.append(new_event)
 
     def handle_match_started(self, payload: dict):
+        if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
+            raise ValueError(
+                f"match_id {self.current_match.match_id} is still in "
+                f"progress, cannot start a new match until this is "
+                f"completed"
+            )
         start_time = util.get_current_time()
         match_type = get_match_type(payload["match_type"])
         # TODO pflanagan: this will be retrieved from persistent storage
@@ -70,12 +76,6 @@ class MatchEngine(Context):
         return mce
 
     def on_match_started(self, mse: MatchStartedEvent):
-        if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
-            raise ValueError(
-                f"match_id {self.current_match.match_id} is still in "
-                f"progress, cannot start a new match until this is "
-                f"completed"
-            )
         self.current_match = Match(mse, self)
         self._child_context = self.current_match
 

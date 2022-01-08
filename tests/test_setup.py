@@ -1,5 +1,6 @@
 import itertools
 
+from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
@@ -37,6 +38,8 @@ def test_new_match(mock_engine, registrar):
     mock_engine.on_event(new_match_message)
     assert mock_engine.current_match.max_overs == 20
     assert mock_engine.current_match.home_team.name == HOME_TEAM
+    assert mock_engine.current_match.match_id == 0
+    assert mock_engine.current_match.state == MatchState.IN_PROGRESS
 
 
 def test_new_innings(registrar, mock_match):
