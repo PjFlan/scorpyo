@@ -1,3 +1,5 @@
+import enum
+
 from scorpyo.context import Context
 from scorpyo.entity import EntityType
 from scorpyo.match import Match, MatchState
@@ -20,6 +22,7 @@ class MatchEngine(Context):
     def __init__(self):
         super().__init__()
         self.current_match = None
+        self.state = EngineState.LOCKED
         self.events = []
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
@@ -82,3 +85,8 @@ class MatchEngine(Context):
     def on_match_completed(self, mce: MatchCompletedEvent):
         self.current_match.state = mce.reason
         # TODO pflanagan: send out a message
+
+
+class EngineState(enum.Enum):
+    LOCKED = 0
+    RUNNING = 1

@@ -8,7 +8,6 @@ class Context:
         self._handlers = {}
         self._child_context = None
 
-    # TODO pflanagan: entity_registrar should be implemented as a service
     @classmethod
     def set_entity_registrar(cls, entity_registrar: EntityRegistrar):
         cls.entity_registrar = entity_registrar
