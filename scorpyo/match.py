@@ -15,7 +15,7 @@ from scorpyo.events import (
 from scorpyo.entity import EntityType
 from scorpyo.innings import Innings, InningsState
 from scorpyo.score import Scoreable
-from scorpyo.team import Team
+from scorpyo.team import Team, MatchTeam
 
 
 # TODO pflanagan: I don't like multiple inheritance here
@@ -32,11 +32,14 @@ class Match(Context, Scoreable):
         self.match_type = mse.match_type
         self.home_team = mse.home_team
         self.away_team = mse.away_team
+        self.home_lineup = MatchTeam(self.match_id, self.home_team)
+        self.away_lineup = MatchTeam(self.match_id, self.away_team)
         self.match_inningses = []
         self.num_innings_completed = 0
 
         self.add_handler(EventType.INNINGS_STARTED, self.handle_innings_started)
         self.add_handler(EventType.INNINGS_COMPLETED, self.handle_innings_completed)
+        self.add_handler(EventType.REGISTER_LINE_UP, self.handle_team_lineup)
 
     @property
     def max_overs(self) -> int:
@@ -55,6 +58,10 @@ class Match(Context, Scoreable):
         return [self.home_team, self.away_team]
 
     @property
+    def lineups(self) -> List[MatchTeam]:
+        return [self.home_lineup, self.away_lineup]
+
+    @property
     def current_innings(self) -> Optional[Innings]:
         if len(self.match_inningses) == 0:
             return None
@@ -69,18 +76,20 @@ class Match(Context, Scoreable):
                 return self.match_inningses[0]() + 1
         elif self.num_innings_completed < 3:
             return None
+        bowling_team = self.current_innings.bowling_team
+        batting_team = self.current_innings.batting_team
         if len(self.match_inningses) == 3:
             # PF: if we have not yet started the 4th innings we need to make sure
             # we preempt who will be the batting and bowling teams
             bowling_team = (
                 self.current_innings.batting_team
                 if len(self.match_inningses) == 3
-                else self.current_innings.bowling_team
+                else bowling_team
             )
             batting_team = (
                 self.current_innings.bowling_team
                 if len(self.match_inningses) == 3
-                else self.current_innings.bating_team
+                else batting_team
             )
         batting_team_first_inn_runs = self.get_team_runs(batting_team, 0)
         bowling_team_total_runs = self.get_team_runs(bowling_team)
@@ -101,6 +110,12 @@ class Match(Context, Scoreable):
         if self.runs_to_win is None:
             return False
         return self.runs_to_win == 0
+
+    def get_lineup(self, team: Team) -> Optional[MatchTeam]:
+        for lineup in self.lineups:
+            if lineup.team == team:
+                return lineup
+        return None
 
     def get_team_runs(self, team: Team, innings_filter=None):
         runs = 0
@@ -127,15 +142,35 @@ class Match(Context, Scoreable):
         start_time = util.get_current_time()
         # index innings from 0 not 1
         innings_num = self.num_innings_completed
+        if not self.home_lineup or not self.away_lineup:
+            raise ValueError(
+                "cannot start an innings without first defining the "
+                "lineups of each team"
+            )
+        batting_team_name = payload.get("batting_team")
+        if not batting_team_name:
+            raise ValueError("must provide batting team when starting new innings")
         batting_team = self.entity_registrar.get_entity_data(
-            EntityType.TEAM, payload["batting_team"]
+            EntityType.TEAM, batting_team_name
         )
-        bowling_team = [team for team in self.teams if team != batting_team][0]
+        batting_lineup = self.get_lineup(batting_team)
+        bowling_lineup = [
+            lineup for lineup in self.lineups if lineup != batting_lineup
+        ][0]
         opening_bowler = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["opening_bowler"]
         )
+        if opening_bowler not in bowling_lineup:
+            raise ValueError(
+                f"no bowler in bowling team {bowling_lineup.name} with "
+                f"name {opening_bowler.name}"
+            )
         ise = InningsStartedEvent(
-            innings_num, start_time, batting_team, bowling_team, opening_bowler
+            innings_num,
+            start_time,
+            batting_lineup,
+            bowling_lineup,
+            opening_bowler,
         )
         self.on_innings_started(ise)
         return ise
@@ -147,6 +182,21 @@ class Match(Context, Scoreable):
         ice = InningsCompletedEvent(innings_id, end_time, reason)
         self.on_innings_completed(ice)
         return ice
+
+    def handle_team_lineup(self, payload: dict):
+        home_or_away = payload.get("team")
+        if not home_or_away or home_or_away not in ["home", "away"]:
+            raise ValueError(
+                f"must specify whether team is home or away when "
+                f"registering a lineup"
+            )
+        team_obj = {"home": self.home_lineup, "away": self.away_lineup}[home_or_away]
+        lineup = payload.get("lineup")
+        if not lineup:
+            raise ValueError("must provide lineup when registering a lineup")
+        team_obj.add_lineup(
+            self.entity_registrar.get_from_names(EntityType.PLAYER, payload["lineup"])
+        )
 
     def on_innings_started(self, ise: InningsStartedEvent):
         new_innings = Innings(ise, self)

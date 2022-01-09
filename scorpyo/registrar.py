@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import List
 
 from scorpyo.entity import EntityType
 from scorpyo.player import Player
@@ -27,8 +26,8 @@ class EntityRegistrar:
         self._id_counter += 1
         return new_player
 
-    def create_team(self, name: str, line_up: List[Player]):
-        new_team = Team(self._id_counter, name, line_up)
+    def create_team(self, name: str):
+        new_team = Team(self._id_counter, name)
         self._store[EntityType.TEAM].append(new_team)
         self._id_counter += 1
         return new_team

@@ -4,6 +4,7 @@ from enum import Enum
 class EntityType(Enum):
     PLAYER = 0
     TEAM = 1
+    MATCH_TEAM = 2
 
 
 class Entity:

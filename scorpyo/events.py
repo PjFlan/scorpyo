@@ -5,7 +5,7 @@ from scorpyo.dismissal import Dismissal
 from scorpyo.static_data.match import MatchType
 from scorpyo.player import Player
 from scorpyo.score import Score
-from scorpyo.team import Team
+from scorpyo.team import Team, MatchTeam
 
 
 class EventType(Enum):
@@ -19,6 +19,7 @@ class EventType(Enum):
     MATCH_COMPLETED = 7
     BATTER_INNINGS_COMPLETED = 8
     BATTER_INNINGS_STARTED = 9
+    REGISTER_LINE_UP = 10
 
 
 class MatchStartedEvent(NamedTuple):
@@ -38,8 +39,8 @@ class MatchCompletedEvent(NamedTuple):
 class InningsStartedEvent(NamedTuple):
     innings_num: int
     start_time: float
-    batting_team: Team
-    bowling_team: Team
+    batting_lineup: MatchTeam
+    bowling_lineup: MatchTeam
     opening_bowler: Player
 
 

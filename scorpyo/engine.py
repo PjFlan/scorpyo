@@ -52,16 +52,6 @@ class MatchEngine(Context):
         away_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, payload["away_team"]
         )
-        home_team.add_line_up(
-            self.entity_registrar.get_from_names(
-                EntityType.PLAYER, payload["home_line_up"]
-            )
-        )
-        away_team.add_line_up(
-            self.entity_registrar.get_from_names(
-                EntityType.PLAYER, payload["away_line_up"]
-            )
-        )
         mse = MatchStartedEvent(match_id, match_type, start_time, home_team, away_team)
         self.on_match_started(mse)
         return mse

@@ -10,6 +10,7 @@ from scorpyo.over import OverState
 from scorpyo.player import Player
 from scorpyo.registrar import EntityRegistrar, EntityType
 from scorpyo.static_data import match
+from scorpyo.team import MatchTeam
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -64,27 +65,21 @@ class MockMatch(Match):
             self.current_innings.handle_over_completed(oc_payload)
 
     def apply_overs(self, num_overs) -> Player:
-        bowling_team = self.current_innings.bowling_team
+        bowling_lineup = self.current_innings.bowling_lineup
         next_idx = 0
         for over in range(num_overs):
-            next_idx = over % len(bowling_team)
-            next_bowler = bowling_team[next_idx]
+            next_idx = over % len(bowling_lineup)
+            next_bowler = bowling_lineup[next_idx]
             self.apply_over(next_bowler)
-        next_bowler = bowling_team[(next_idx + 1) % len(bowling_team)]
+        next_bowler = bowling_lineup[(next_idx + 1) % len(bowling_lineup)]
         return next_bowler
 
 
 @pytest.fixture()
 def registrar():
     registrar = EntityRegistrar()
-    line_up_home = []
-    line_up_away = []
-    for name in test_players_home:
-        line_up_home.append(registrar.create_player(name))
-    for name in test_players_away:
-        line_up_away.append(registrar.create_player(name))
-    registrar.create_team(test_team_home, line_up_home)
-    registrar.create_team(test_team_away, line_up_away)
+    registrar.create_team(test_team_home)
+    registrar.create_team(test_team_away)
     Context.set_entity_registrar(registrar)
     return registrar
 
@@ -96,14 +91,25 @@ def mock_engine(registrar):
 
 @pytest.fixture()
 def mock_match(registrar):
-    return MockMatch()
-
-
-@pytest.fixture()
-def mock_innings(mock_match, registrar):
+    mock_match = MockMatch()
     teams = registrar.get_all_of_type(EntityType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
+    mock_match.home_lineup = MatchTeam(mock_match.match_id, mock_match.home_team)
+    mock_match.away_lineup = MatchTeam(mock_match.match_id, mock_match.away_team)
+    lineup_home = []
+    lineup_away = []
+    for name in test_players_home:
+        lineup_home.append(registrar.create_player(name))
+    for name in test_players_away:
+        lineup_away.append(registrar.create_player(name))
+    mock_match.home_lineup.add_lineup(lineup_home)
+    mock_match.away_lineup.add_lineup(lineup_away)
+    return mock_match
+
+
+@pytest.fixture()
+def mock_innings(mock_match: MockMatch):
     bowler_name = test_players_away[-1]
     payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
     mock_match.handle_innings_started(payload)

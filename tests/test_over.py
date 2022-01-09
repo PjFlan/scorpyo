@@ -4,7 +4,6 @@ import pytest
 
 from scorpyo.innings import Innings
 from scorpyo.over import OverState
-from scorpyo.player import Player
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.static_data.match import MatchType
 from tests.common import apply_ball_events
@@ -13,7 +12,7 @@ from tests.common import apply_ball_events
 def rotate_bowlers(
     mock_innings: Innings,
     registrar: EntityRegistrar,
-    bowlers: List[Player],
+    bowlers: List[str],
     total_overs: int,
 ) -> int:
     payloads = [{"score_text": "."}] * 6

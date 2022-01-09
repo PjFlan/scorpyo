@@ -31,10 +31,12 @@ class Innings(Context, Scoreable):
         self.end_time = None
         self.innings_num = ise.innings_num
         self.state = InningsState.IN_PROGRESS
-        self.batting_team = ise.batting_team
-        self.bowling_team = ise.bowling_team
-        batter_one = ise.batting_team[0]
-        batter_two = ise.batting_team[1]
+        self.batting_lineup = ise.batting_lineup
+        self.bowling_lineup = ise.bowling_lineup
+        self.batting_team = self.batting_lineup.team
+        self.bowling_team = self.bowling_lineup.team
+        batter_one = ise.batting_lineup[0]
+        batter_two = ise.batting_lineup[1]
 
         first_over = Over(0, ise.opening_bowler, self)
         self.overs = [first_over]
@@ -89,7 +91,7 @@ class Innings(Context, Scoreable):
         num_down = self.wickets_down
         next_batter_index = num_down + 1
         try:
-            next_batter = self.batting_team[next_batter_index]
+            next_batter = self.batting_lineup[next_batter_index]
         except IndexError as e:
             raise e
         return next_batter
@@ -97,13 +99,13 @@ class Innings(Context, Scoreable):
     @property
     def yet_to_bat(self) -> List[Player]:
         players_batted = set(bi.player for bi in self.batter_inningses)
-        all_players = set(self.batting_team.get_line_up())
+        all_players = set(self.batting_lineup.get_lineup())
         yet_to_bat = set.difference(all_players, players_batted)
         return list(yet_to_bat)
 
     @property
     def num_batters_remaining(self) -> int:
-        num_batters = len(self.batting_team)
+        num_batters = len(self.batting_lineup)
         num_already_batted = len(self.batter_inningses)
         assert num_batters >= num_already_batted
         return num_batters - num_already_batted
@@ -230,9 +232,9 @@ class Innings(Context, Scoreable):
         bowler = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["bowler"]
         )
-        if bowler not in self.bowling_team:
+        if bowler not in self.bowling_lineup:
             raise ValueError(
-                f"bowler {bowler} does not play for team {self.bowling_team}"
+                f"bowler {bowler} does not play for team {self.bowling_lineup}"
             )
         next_over_num = len(self.overs)
         max_overs_allowed = self.match.max_overs
@@ -289,9 +291,10 @@ class Innings(Context, Scoreable):
             self.off_strike_innings = new_innings
 
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
-        if bic.batter not in self.batting_team:
+        if bic.batter not in self.batting_lineup:
             raise ValueError(
-                "batter {bic.batter} is not part of batting team {" "self.batting_team}"
+                "batter {bic.batter} is not part of batting team {"
+                "self.batting_lineup}"
             )
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
         if bic.batting_state == BatterInningsState.DISMISSED:

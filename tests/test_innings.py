@@ -62,15 +62,15 @@ def test_innings_completed_all_out(
 ):
     # TODO pflanagan: theres a lot of boilerplate here needed to take wickets
     # maybe I should instead patch various methods on my mock class to do this for me
-    num_batters = len(mock_innings.batting_team)
+    num_batters = len(mock_innings.batting_lineup)
     batters_at_create = [mock_innings.non_striker.name]
     next_to_dismiss = mock_innings.striker
     for i in range(2, num_batters - 1):
-        new_batter = mock_innings.batting_team[i]
+        new_batter = mock_innings.batting_lineup[i]
         mock_match.swap_batters(next_to_dismiss, new_batter)
         next_to_dismiss = new_batter
     batters_at_create.append(new_batter)
-    expected_ytb = [mock_innings.batting_team[num_batters - 1]]
+    expected_ytb = [mock_innings.batting_lineup[num_batters - 1]]
     actual_atc = [i.player.name for i in mock_innings.active_batter_innings]
     assert set(mock_innings.yet_to_bat) == set(expected_ytb)
     assert set(batters_at_create) == set(actual_atc)
@@ -78,7 +78,7 @@ def test_innings_completed_all_out(
     with pytest.raises(AssertionError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match(r"there are still batters remaining")
-    new_batter = mock_innings.batting_team[-1]
+    new_batter = mock_innings.batting_lineup[-1]
     mock_match.swap_batters(next_to_dismiss, new_batter)
     with pytest.raises(AssertionError) as exc:
         mock_match.handle_innings_completed(payload)

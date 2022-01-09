@@ -5,26 +5,41 @@ from scorpyo.player import Player
 from scorpyo.entity import Entity
 
 
-class Team(Entity, Sequence):
-    def __init__(self, unique_id: int, name: str, line_up: List[Player]):
+class Team(Entity):
+    def __init__(self, unique_id: int, name: str):
         super().__init__(unique_id, name)
-        self._line_up = line_up
-        self._is_home_team = False
 
-    def add_line_up(self, line_up: list[Player]):
-        self._line_up = line_up
 
-    def get_line_up(self) -> List[Player]:
-        return self._line_up
+class MatchTeam(Sequence):
+    def __init__(self, match_id: int, team: Team):
+        self.match_id = match_id
+        self.team = team
+        self._lineup: List[Player] = []
+
+    def add_lineup(self, lineup: list[Player]):
+        self._lineup = lineup
+
+    def add_player(self, player: Player):
+        self._lineup.append(player)
+
+    def get_lineup(self) -> List[Player]:
+        return self._lineup
 
     def __contains__(self, player: Player) -> bool:
-        return player in self._line_up
+        return player in self._lineup
 
-    def __len__(self) -> int:
-        return len(self._line_up)
+    def __eq__(self, other) -> bool:
+        return self.team == other.team
 
-    def __iter__(self):
-        return next(self._line_up)
+    def __getattr__(self, item):
+        team = super().__getattribute__("team")
+        return getattr(team, item)
 
     def __getitem__(self, item):
-        return self._line_up[item]
+        return self._lineup[item]
+
+    def __iter__(self):
+        return next(self._lineup)
+
+    def __len__(self) -> int:
+        return len(self._lineup)
