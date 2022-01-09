@@ -15,13 +15,19 @@ class MatchClient:
     def __init__(self, engine: MatchEngine):
         self.engine: MatchEngine = engine
         self.registrar: EntityRegistrar = None
-        self.sources: List[InputSource] = []
+        self._sources: List[InputSource] = []
 
     def read(self):
         # go to various input sources and query for new data
         # there should be a hierarchy of which gets read first (e.g. entity before
         # events) but should also be away for our sources to forward new data
-        pass
+        for source in self._sources:
+            source.read()
+
+    def process(self):
+        for source in self._sources:
+            for message in source.query():
+                self.handle_message(message)
 
     def handle_message(self, message: dict):
         # interpret message and send it to the engine, registrar or otherwise
@@ -36,8 +42,9 @@ class MatchClient:
         ]
         func(message)
 
-    def register_source(self, source: "InputSource"):
-        self.sources.append(source)
+    def register_sources(self, sources: List["InputSource"]):
+        # a list of sources ordered according to be which should be consumed first
+        self._sources = sources
 
     def on_entity_message(self, payload: dict):
         if not self.registrar:
@@ -57,40 +64,34 @@ class MatchClient:
 
     def on_event_message(self, payload: dict):
         # pass to the engine for processing and confirm the engine acked the message
+        # the client should know the internal protocol accepted by the engine and
+        # format messages accordingly. For now I will maintain this protocol distinctly
+        # between engine and client but if it grows, may need to move to protocol buff
         assert (
             self.engine.state == EngineState.RUNNNING
         ), "engine is not running, cannot accept new messages"
         pass
 
-    @property
-    def is_match_ready(self):
-        # do we have appropriate entity data to begin a match with
-        # or should we continue reading for more
-        # if we try to interpret an event message while this is still false
-        # then we have an issue
-        return False
-
     def __enter__(self):
         pass
 
     def __exit__(self):
-        for source in self.sources:
+        for source in self._sources:
             source.close()
 
 
 class InputSource(abc.ABC):
 
     # Mostly a wrapper around various sources of match messages (files, command line,
-    # web etc.)
+    # web, database etc.)
     def __init__(self):
-        self.messages = queue.Queue()
         self.is_connected = False
+        self.message_buffer: queue.Queue = queue.Queue()
 
     def query(self):
         # do we have new data available to pass to the reader
-        if not self.messages.empty():
-            return self.messages.get()
-        return None
+        while not self.message_buffer.empty():
+            yield self.message_buffer.get()
 
     @abc.abstractmethod
     def connect(self):
@@ -103,14 +104,13 @@ class InputSource(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def has_data(self):
-        pass
-
-    @abc.abstractmethod
     def read(self):
         # read from the stream until the internal buffer is full and cache data that
         # has yet to be read upstream
         pass
+
+    def has_data(self):
+        return not self.message_buffer.empty()
 
 
 class FileSource(InputSource):
@@ -121,7 +121,6 @@ class FileSource(InputSource):
         super().__init__()
         self.URL: str = url
         self.file_handler: IOBase = None
-        self.cache: queue.Queue = queue.Queue()
 
     def connect(self):
         try:
@@ -133,9 +132,6 @@ class FileSource(InputSource):
         if not self.file_handler.closed:
             self.file_handler.close()
 
-    def has_data(self):
-        return not self.cache.empty()
-
     def read(self):
         for line in self.file_handler.readlines():
-            self.cache.put(line)
+            self.message_buffer.put(line)
