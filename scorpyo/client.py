@@ -1,5 +1,6 @@
 import abc
-import queue
+from collections import deque
+from contextlib import contextmanager
 from io import IOBase
 from typing import List
 
@@ -8,9 +9,12 @@ from scorpyo.engine import MatchEngine, EngineState
 from scorpyo.entity import EntityType
 from scorpyo.registrar import EntityRegistrar
 
+"""
+Ideally in future most entity data will be persisted server side but for
+now the client can read in this info on startup each time and keep in memory
+"""
 
-# Ideally in future most entity data will be persisted server side but for
-# now the client can read in this info on startup each time and keep in memory
+
 class MatchClient:
     def __init__(self, engine: MatchEngine):
         self.engine: MatchEngine = engine
@@ -18,19 +22,18 @@ class MatchClient:
         self._sources: List[InputSource] = []
 
     def read(self):
-        # go to various input sources and query for new data
-        # there should be a hierarchy of which gets read first (e.g. entity before
-        # events) but should also be away for our sources to forward new data
+        """loop through the input sources and instruct them to read new data"""
         for source in self._sources:
             source.read()
 
     def process(self):
+        """do something with the new data"""
         for source in self._sources:
             for message in source.query():
                 self.handle_message(message)
 
     def handle_message(self, message: dict):
-        # interpret message and send it to the engine, registrar or otherwise
+        """interpret a message and send it to the engine, registrar or otherwise"""
         m_type = message["message_type"]
         m_body = message["body"]
         if not m_type or not m_body:
@@ -43,7 +46,7 @@ class MatchClient:
         func(message)
 
     def register_sources(self, sources: List["InputSource"]):
-        # a list of sources ordered according to be which should be consumed first
+        """a list of sources, ordered according to which should be consumed first"""
         self._sources = sources
 
     def on_entity_message(self, payload: dict):
@@ -63,54 +66,59 @@ class MatchClient:
             self.registrar.create_team(payload["name"])
 
     def on_event_message(self, payload: dict):
-        # pass to the engine for processing and confirm the engine acked the message
-        # the client should know the internal protocol accepted by the engine and
-        # format messages accordingly. For now I will maintain this protocol distinctly
-        # between engine and client but if it grows, may need to move to protocol buff
+        """pass to the engine for processing and confirm the engine acked the message
+        the client should know the internal protocol accepted by the engine and
+        format messages accordingly. For now I will maintain this protocol distinctly
+        between engine and client but if it grows, may need to move to protocol buff"""
         assert (
             self.engine.state == EngineState.RUNNNING
         ), "engine is not running, cannot accept new messages"
         pass
 
-    def __enter__(self):
-        pass
-
-    def __exit__(self):
+    @contextmanager
+    def connect(self):
+        for source in self._sources:
+            source.connect()
+        yield self
         for source in self._sources:
             source.close()
 
 
 class InputSource(abc.ABC):
+    """Mostly a wrapper around various sources of match messages (files, command line,
+    web, database etc.)"""
 
-    # Mostly a wrapper around various sources of match messages (files, command line,
-    # web, database etc.)
     def __init__(self):
         self.is_connected = False
-        self.message_buffer: queue.Queue = queue.Queue()
+        self.message_buffer: deque = deque()
 
     def query(self):
-        # do we have new data available to pass to the reader
-        while not self.message_buffer.empty():
-            yield self.message_buffer.get()
+        """clear the current cache"""
+        while self.message_buffer:
+            yield self.message_buffer.popleft()
 
     @abc.abstractmethod
     def connect(self):
-        # open a connection to the underlying stream
+        """open a connection to the underlying source"""
         pass
 
     @abc.abstractmethod
     def close(self):
-        # close the connection to the underlying
+        """close the connection to the underlying source"""
+        pass
+
+    @abc.abstractmethod
+    def is_open(self):
         pass
 
     @abc.abstractmethod
     def read(self):
-        # read from the stream until the internal buffer is full and cache data that
-        # has yet to be read upstream
+        """read from the source until the internal buffer is full and cache data that
+        has yet to be processed upstream"""
         pass
 
     def has_data(self):
-        return not self.message_buffer.empty()
+        return self.message_buffer
 
 
 class FileSource(InputSource):
@@ -124,14 +132,17 @@ class FileSource(InputSource):
 
     def connect(self):
         try:
-            self.file_handler = open(self.URL)
+            self.file_handler = open(self.URL, "r")
         except IOError:
             raise ConnectionError(f"error connecting to file source {self.URL}")
 
     def close(self):
-        if not self.file_handler.closed:
+        if self.is_open():
             self.file_handler.close()
 
     def read(self):
         for line in self.file_handler.readlines():
-            self.message_buffer.put(line)
+            self.message_buffer.append(line)
+
+    def is_open(self):
+        return not self.file_handler.closed
