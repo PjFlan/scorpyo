@@ -43,29 +43,29 @@ class MatchClient:
         func = {"entity": self.on_entity_message, "event": self.on_event_message}[
             m_type
         ]
-        func(message)
+        func(message["body"])
 
     def register_sources(self, sources: List["InputSource"]):
         """a list of sources, ordered according to which should be consumed first"""
         self._sources = sources
 
-    def on_entity_message(self, payload: dict):
+    def on_entity_message(self, message: dict):
         if not self.registrar:
             self.registrar = EntityRegistrar()
             Context.set_entity_registrar(self.registrar)
-        e_type = payload.get("entity_type")
+        e_type = message.get("entity_type")
         if not e_type:
-            raise ValueError(f"entity message is missing entity type {payload}")
+            raise ValueError(f"entity message is missing entity type {message}")
         try:
             entity_type = EntityType[e_type]
         except KeyError:
             raise ValueError(f"entity message payload has an invalid type {e_type}")
         if entity_type == EntityType.PLAYER:
-            self.registrar.create_player(payload["name"])
+            self.registrar.create_player(message["name"])
         elif entity_type == EntityType.TEAM:
-            self.registrar.create_team(payload["name"])
+            self.registrar.create_team(message["name"])
 
-    def on_event_message(self, payload: dict):
+    def on_event_message(self, message: dict):
         """pass to the engine for processing and confirm the engine acked the message
         the client should know the internal protocol accepted by the engine and
         format messages accordingly. For now I will maintain this protocol distinctly
@@ -141,8 +141,10 @@ class FileSource(InputSource):
             self.file_handler.close()
 
     def read(self):
-        for line in self.file_handler.readlines():
-            self.message_buffer.append(line)
+        # TODO: should be reading in json here rather than line separated messages
+        # but maybe can inject a parser to format into json each message
+        for line in self.file_handler:
+            self.message_buffer.append(line.strip())
 
     def is_open(self):
         return not self.file_handler.closed
