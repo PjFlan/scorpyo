@@ -12,10 +12,12 @@ import scorpyo.util as util
 from scorpyo.static_data.match import get_match_type
 
 
-# This class should be responsible for receiving a stream of match events (commands)
-# processing the event based on its internal state, and spitting out an event message
-# that other applications (client, score reporter) can listen to and do their own job
 class MatchEngine(Context):
+    """
+    Receives a stream of match events (commands) and processes the event
+    based on its internal state, then sends out a corresponding event message
+    that other applications (client, score reporter) can listen for
+    """
 
     match_id = 0
 
@@ -23,7 +25,8 @@ class MatchEngine(Context):
         super().__init__()
         self.current_match = None
         self.state = EngineState.LOCKED
-        self.events = []
+        self._events = []
+        self._clients = []
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
@@ -32,7 +35,7 @@ class MatchEngine(Context):
         event_type = EventType(event_message["event_type"])
         payload = event_message["payload"]
         new_event = self.handle_event(event_type, payload)
-        self.events.append(new_event)
+        self._events.append(new_event)
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
@@ -75,6 +78,9 @@ class MatchEngine(Context):
     def on_match_completed(self, mce: MatchCompletedEvent):
         self.current_match.state = mce.reason
         # TODO pflanagan: send out a message
+
+    def on_client_registered(self, client: "MatchClient"):
+        self._clients.append(client)
 
 
 class EngineState(enum.Enum):

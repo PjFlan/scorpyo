@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Optional
 
 from scorpyo.entity import EntityType
 from scorpyo.player import Player
@@ -10,9 +11,11 @@ class EntityRegistrar:
         self._store = defaultdict(list)
         self._id_counter = 0
 
-    def get_entity_data(self, entity_type: EntityType, item_reference: any):
+    def get_entity_data(
+        self, entity_type: EntityType, item_reference: any
+    ) -> Optional[Player]:
         if not item_reference:
-            return
+            return None
         search_list = self._store[entity_type]
         lookup = "name" if isinstance(item_reference, str) else "unique_id"
         for test_item in search_list:
