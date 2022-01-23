@@ -12,6 +12,12 @@ import scorpyo.util as util
 from scorpyo.static_data.match import get_match_type
 
 
+# TODO: implement rollback, and pushing processed events onto a listener stream
+# If anything goes wrong the engine should lock itself until the issue resolve (but
+# not crash). Also need to implement an API for querying the state of the match
+# for future applications like MatchReporter to consume and format
+
+
 class MatchEngine(Context):
     """
     Receives a stream of match events (commands) and processes the event
@@ -24,17 +30,15 @@ class MatchEngine(Context):
     def __init__(self):
         super().__init__()
         self.current_match = None
-        self.state = EngineState.LOCKED
+        self.state: EngineState = EngineState.LOCKED
         self._events = []
         self._clients = []
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
-    def on_event(self, event_message: dict):
-        event_type = EventType(event_message["event_type"])
-        payload = event_message["payload"]
-        new_event = self.handle_event(event_type, payload)
+    def on_event(self, event_type: EventType, event_message: dict):
+        new_event = self.handle_event(event_type, event_message)
         self._events.append(new_event)
 
     def handle_match_started(self, payload: dict):
@@ -61,8 +65,8 @@ class MatchEngine(Context):
 
     def handle_match_completed(self, payload: dict):
         end_time = util.get_current_time()
-        match_id = payload["match_id"]
-        reason = MatchState(payload["reason"])
+        match_id = payload.get("match_id")
+        reason = payload.get("reason")
         assert match_id == self.current_match.match_id, (
             "match_id from event payload {match_id} "
             "does not equal current match_id {self.current_match.match_id}"

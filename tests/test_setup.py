@@ -1,5 +1,7 @@
 import itertools
 
+from scorpyo.engine import MatchEngine
+from scorpyo.events import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
@@ -28,14 +30,13 @@ def test_unique_id(registrar):
 
 def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     test_payload = {
-        "match_type": "T",
+        "match_type": "T20",
         "home_team": HOME_TEAM,
         "away_team": AWAY_TEAM,
     }
     for player_name in HOME_PLAYERS + AWAY_PLAYERS:
         registrar.create_player(player_name)
-    new_match_message = {"event_type": 0, "payload": test_payload}
-    mock_engine.on_event(new_match_message)
+    mock_engine.on_event(EventType.MATCH_STARTED, test_payload)
     home_lineup_payload = {"team": "home", "lineup": HOME_PLAYERS}
     away_lineup_payload = {"team": "away", "lineup": AWAY_PLAYERS}
     mock_engine.current_match.handle_team_lineup(home_lineup_payload)
@@ -46,6 +47,7 @@ def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     assert mock_engine.current_match.state == MatchState.IN_PROGRESS
     assert len(mock_engine.current_match.home_lineup) == 11
     assert len(mock_engine.current_match.away_lineup) == 11
+    MatchEngine.match_id = 0
 
 
 def test_new_innings(registrar, mock_match):

@@ -8,6 +8,7 @@ import pytest
 from scorpyo.client import MatchClient, FileSource, json_reader, plain_reader
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
+from scorpyo.events import EventType
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
@@ -172,5 +173,8 @@ def test_entity_message_errors(mock_client):
     assert exc.match("entity message must have at least an entity name")
 
 
-def test_event_message(mock_client):
-    pass
+def test_event_message(mock_client, mocker):
+    handler_patch = mocker.patch.object(MatchEngine, "handle_event")
+    event = {"event_type": "match_started", "body": {"noop": "noop"}}
+    mock_client.on_event_message(event)
+    assert handler_patch.called_with(EventType.MATCH_STARTED, {"noop": "noop"})

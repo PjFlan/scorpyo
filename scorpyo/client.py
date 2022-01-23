@@ -16,6 +16,10 @@ Ideally in future most entity data will be persisted server side but for
 now the client can read in this info on startup each time and keep in memory
 """
 
+# TODO: implement message acking from the engine - i.e. check that the message
+# processed the message the client sent by monitoring output on the engine stream
+# if anything goes awry, the client can respond appropriately
+
 
 class MatchClient:
     def __init__(self, engine: MatchEngine):
@@ -25,7 +29,7 @@ class MatchClient:
         self._pending_events = []
 
     def read(self):
-        """loop through the input sources and instruct them to read new data"""
+        """loop through the input sources and trigger them to read new data"""
         for source in self._sources:
             source.read()
 
@@ -76,18 +80,19 @@ class MatchClient:
         """pass to the engine for processing and confirm the engine acked the message
         the client should know the internal protocol accepted by the engine and
         format messages accordingly. For now I will maintain this protocol distinctly
-        between engine and client but if it grows, may need to move to protocol buff"""
+        between engine and client but if it grows, may need to move to a protobuf"""
         e_type = message.get("event_type")
         if not e_type:
             raise ValueError(f"no event type passed in event message")
         try:
+            # TODO: probably should be passing in the event id rather than raw string
             event_type = EventType[e_type.upper()]
         except KeyError:
             raise ValueError(f"event message payload has an invalid type {e_type}")
         event = message.get("body")
         if not event:
-            raise ValueError(f"no body passed in event message")
-        self.engine.handle_event(event_type, event)
+            raise ValueError(f"no data passed in event message")
+        self.engine.on_event(event_type, event)
         self._pending_events.append(event)
 
     @contextmanager
