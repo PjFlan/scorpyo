@@ -111,6 +111,10 @@ class Match(Context, Scoreable):
             return False
         return self.runs_to_win == 0
 
+    def status(self):
+        for i, innings in enumerate(self.match_inningses):
+            print(f"innings {i}: {innings.status()}\n")
+
     def get_lineup(self, team: Team) -> Optional[MatchTeam]:
         for lineup in self.lineups:
             if lineup.team == team:

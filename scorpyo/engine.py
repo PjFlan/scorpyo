@@ -40,6 +40,14 @@ class MatchEngine(Context):
     def on_event(self, event_type: EventType, event_message: dict):
         new_event = self.handle_event(event_type, event_message)
         self._events.append(new_event)
+        self.publish_score_update()
+
+    def publish_score_update(self):
+        if not self.current_match:
+            return
+        score_status = self.current_match.status()
+        for client in self._clients:
+            client.on_match_update(score_status)
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:

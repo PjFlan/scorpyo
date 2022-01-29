@@ -21,4 +21,4 @@ class Context:
             return handler(payload)
         if not self._child_context:
             raise ValueError(f"no context defined to handle event {event_type}")
-        return self._child_context.handle_event(event_type)
+        return self._child_context.handle_event(event_type, payload)

@@ -119,6 +119,9 @@ class Innings(Context, Scoreable):
         ]
         return inningses
 
+    def status(self):
+        return f"{self.total_runs}-{self.wickets_down}"
+
     def get_batter_innings(self, player: Player) -> "BatterInnings":
         batter_innings = find_innings(player, self.batter_inningses)
         return batter_innings

@@ -22,7 +22,7 @@ now the client can read in this info on startup each time and keep in memory
 
 
 class MatchClient:
-    def __init__(self, engine: MatchEngine):
+    def __init__(self, engine: MatchEngine = None):
         self.engine: MatchEngine = engine
         self.registrar: EntityRegistrar = None
         self._sources: List[InputSource] = []
@@ -38,6 +38,9 @@ class MatchClient:
         for source in self._sources:
             for message in source.query():
                 self.handle_message(message)
+
+    def assign_engine(self, engine: MatchEngine):
+        self.engine = engine
 
     def handle_message(self, message: dict):
         """interpret a message and send it to the engine, registrar or otherwise"""
@@ -71,10 +74,13 @@ class MatchClient:
         name = message.get("name")
         if not name:
             raise ValueError(f"entity message must have at least an entity name")
+        names = [name] if isinstance(name, str) else name
         if entity_type == EntityType.PLAYER:
-            self.registrar.create_player(name)
+            func = self.registrar.create_player
         elif entity_type == EntityType.TEAM:
-            self.registrar.create_team(name)
+            func = self.registrar.create_team
+        for name_ in names:
+            func(name_)
 
     def on_event_message(self, message: dict):
         """pass to the engine for processing and confirm the engine acked the message
@@ -94,6 +100,9 @@ class MatchClient:
             raise ValueError(f"no data passed in event message")
         self.engine.on_event(event_type, event)
         self._pending_events.append(event)
+
+    def on_match_status(self, status: str):
+        print(status)
 
     @contextmanager
     def connect(self):
