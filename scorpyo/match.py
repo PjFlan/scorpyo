@@ -11,6 +11,7 @@ from scorpyo.events import (
     MatchStartedEvent,
     EventType,
     InningsCompletedEvent,
+    RegisterTeamLineup,
 )
 from scorpyo.entity import EntityType
 from scorpyo.innings import Innings, InningsState
@@ -89,7 +90,7 @@ class Match(Context, Scoreable):
             0, next_bowling_team_total_runs + 1 - next_batting_team_first_inn_runs
         )
 
-    # pflanagan: should really be a property but makes testing annoying
+    # pflanagan: should really be a property but makes testing a pain
     def max_overs(self) -> int:
         return self.match_type.overs
 
@@ -102,13 +103,24 @@ class Match(Context, Scoreable):
 
     def status(self) -> dict:
         inningses_status = []
-        output = {"match_id": self.match_id, "snapshot": self.produce_snapshot()}
+        output = {"match_id": self.match_id, "snapshot": self.snapshot()}
         for innings in enumerate(self.match_inningses):
             inningses_status.append(innings.status())
         output["inningses"] = inningses_status
         return output
 
-    def produce_snapshot(self):
+    def overview(self) -> dict:
+        output = {
+            "match_type": self.match_type.name,
+            "start_time": self.start_time,
+            "home_team": self.home_team.name,
+            "away_team": self.away_team.name,
+            "home_lineup": self.home_lineup(),
+            "away_lineup": self.away_lineup(),
+        }
+        return output
+
+    def snapshot(self):
         return ""
 
     def get_lineup(self, team: Team) -> Optional[MatchTeam]:
@@ -185,7 +197,8 @@ class Match(Context, Scoreable):
             opening_bowler,
         )
         self.on_innings_started(ise)
-        return ise
+        message = self.current_innings.overview()
+        return message
 
     def handle_innings_completed(self, payload: dict):
         end_time = util.get_current_time()
@@ -193,7 +206,8 @@ class Match(Context, Scoreable):
         innings_id = payload["match_innings_num"]
         ice = InningsCompletedEvent(innings_id, end_time, reason)
         self.on_innings_completed(ice)
-        return ice
+        message = self.match_inningses[-1].overview()
+        return message
 
     def handle_team_lineup(self, payload: dict):
         home_or_away = payload.get("team")
@@ -209,12 +223,21 @@ class Match(Context, Scoreable):
         team_obj.add_lineup(
             self.entity_registrar.get_from_names(EntityType.PLAYER, payload["lineup"])
         )
+        rlu = RegisterTeamLineup(team_obj.lineup)
+        message = {
+            "team": team_obj.team.name,
+            "home_or_away": home_or_away,
+            "lineup": team_obj(),
+        }
+        return message
 
     def on_innings_started(self, ise: InningsStartedEvent):
         new_innings = Innings(ise, self)
         new_innings.target = self.next_innings_target
         self.add_innings(new_innings)
         self._child_context = new_innings
+        message = self.current_innings.overview()
+        return message
 
     def on_innings_completed(self, ice: InningsCompletedEvent):
         current_innings = self.current_innings
@@ -234,16 +257,21 @@ class Match(Context, Scoreable):
             )
         self.current_innings.on_innings_completed(ice)
         self.num_innings_completed += 1
+        message = self.match_inningses[-1].overview()
+        return message
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
-        self.current_innings.on_ball_completed(bce)
+        message = self.current_innings.on_ball_completed(bce)
+        return message
 
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
-        self.current_innings.on_batter_innings_completed(bic)
+        message = self.current_innings.on_batter_innings_completed(bic)
+        return message
 
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
-        self.current_innings.on_batter_innings_started(bis)
+        message = self.current_innings.on_batter_innings_started(bis)
+        return message
 
 
 class MatchState(enum.Enum):

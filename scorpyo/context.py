@@ -8,15 +8,19 @@ class Context(abc.ABC):
     entity_registrar = None
 
     def __init__(self):
-        self._handlers = {}
+        self._event_handlers = {}
         self._child_context = None
 
     @abc.abstractmethod
-    def produce_snapshot(self) -> dict:
+    def snapshot(self) -> dict:
         pass
 
     @abc.abstractmethod
     def status(self) -> dict:
+        pass
+
+    @abc.abstractmethod
+    def overview(self) -> dict:
         pass
 
     @classmethod
@@ -24,10 +28,10 @@ class Context(abc.ABC):
         cls.entity_registrar = entity_registrar
 
     def add_handler(self, event_type: "EventType", func: callable):
-        self._handlers[event_type] = func
+        self._event_handlers[event_type] = func
 
     def handle_event(self, event_type: "EventType", payload: dict) -> EventMessageType:
-        handler = self._handlers.get(event_type)
+        handler = self._event_handlers.get(event_type)
         if handler:
             return handler(payload)
         if not self._child_context:

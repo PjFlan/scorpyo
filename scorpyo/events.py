@@ -9,17 +9,16 @@ from scorpyo.team import Team, MatchTeam
 
 
 class EventType(Enum):
-    MATCH_STARTED = 0
-    MATCH_TEAM_ADDED = 1
-    INNINGS_STARTED = 2
-    BALL_COMPLETED = 3
-    OVER_STARTED = 4
-    OVER_COMPLETED = 5
-    INNINGS_COMPLETED = 6
-    MATCH_COMPLETED = 7
-    BATTER_INNINGS_COMPLETED = 8
-    BATTER_INNINGS_STARTED = 9
-    REGISTER_LINE_UP = 10
+    MATCH_STARTED = "ms"
+    INNINGS_STARTED = "is"
+    BALL_COMPLETED = "bc"
+    OVER_STARTED = "os"
+    OVER_COMPLETED = "oc"
+    INNINGS_COMPLETED = "ic"
+    MATCH_COMPLETED = "mc"
+    BATTER_INNINGS_COMPLETED = "bic"
+    BATTER_INNINGS_STARTED = "bis"
+    REGISTER_LINE_UP = "rlu"
 
 
 class EventMessageType(Enum):
@@ -28,15 +27,13 @@ class EventMessageType(Enum):
     # TODO pflanagan: at the moment we have no corresponding class for each of these
     #  types and the message is just a python dict. In future should solidify the
     #  interfaces
-    MATCH_STARTED = 0
-    MATCH_COMPLETED = 1
-    INNINGS_STARTED = 2
-    INNINGS_COMPLETED = 3
-    OVER_STARTED = 4
-    OVER_COMPLETED = 5
-    BATTER_INNINGS_STARTED = 6
-    BATTER_INNINGS_COMPLETED = 7
-    INNINGS_UPDATE = 8
+    MATCH_OVERVIEW = "mo"
+    INNINGS_OVERVIEW = "io"
+    OVER_OVERVIEW = "oo"
+    BATTER_INNINGS_OVERVIEW = "baio"
+    BOWLER_INNINGS_OVERVIEW = "boio"
+    INNINGS_UPDATE = "iu"
+    MATCH_TEAM_OVERVIEW = "mto"
 
 
 class MatchStartedEvent(NamedTuple):
@@ -104,3 +101,8 @@ class OverStartedEvent(NamedTuple):
     bowler: Player
     over_number: int
     event_message = EventMessageType.INNINGS_STARTED
+
+
+class RegisterTeamLineup(NamedTuple):
+    lineup: list[Player]
+    event_message = EventMessageType.MATCH_TEAM_OVERVIEW

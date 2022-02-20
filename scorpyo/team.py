@@ -16,14 +16,18 @@ class MatchTeam(Sequence):
         self.team = team
         self._lineup: List[Player] = []
 
+    @property
+    def lineup(self) -> List[Player]:
+        return self._lineup
+
     def add_lineup(self, lineup: list[Player]):
         self._lineup = lineup
 
     def add_player(self, player: Player):
         self._lineup.append(player)
 
-    def get_lineup(self) -> List[Player]:
-        return self._lineup
+    def __call__(self):
+        return [p.name for p in self._lineup]
 
     def __contains__(self, player: Player) -> bool:
         return player in self._lineup

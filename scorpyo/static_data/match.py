@@ -6,13 +6,14 @@ class MatchType(NamedTuple):
     overs: int
     days: int
     bowler_limit: int
+    name: str
 
 
-TWENTY_20 = MatchType(1, 20, 1, 4)
-ONE_DAY = MatchType(1, 50, 1, 10)
-FIRST_CLASS = MatchType(2, None, 4, None)
+TWENTY_20 = MatchType(1, 20, 1, 4, "T20")
+ONE_DAY = MatchType(1, 50, 1, 10, "One Day")
+FIRST_CLASS = MatchType(2, None, 4, None, "First Class")
 
-_match_types = {"T20": TWENTY_20, "ODI": ONE_DAY}
+_match_types = {"T20": TWENTY_20, "OD": ONE_DAY, "FC": FIRST_CLASS}
 
 
 def get_match_type(shortcode: str):

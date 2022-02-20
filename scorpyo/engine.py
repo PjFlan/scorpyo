@@ -26,6 +26,7 @@ class MatchEngine(Context):
     """
 
     match_id = 0
+    event_id = 0
 
     def __init__(self):
         super().__init__()
@@ -38,23 +39,30 @@ class MatchEngine(Context):
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
     def on_event(self, event_type: EventType, event_payload: dict):
-        # TODO pflanagan: need to upgrade all the handlers to send a message back as
-        #  part of their processing
         self._events.append(event_payload)
         event_message = self.handle_event(event_type, event_payload)
-        return event_message
+        message = {
+            "event_type": event_type.value,
+            "event_id": self.event_id,
+            "message": event_message,
+        }
+        self.event_id += 1
+        return message
 
-    def produce_snapshot(self) -> dict:
+    def snapshot(self) -> dict:
         # TODO pflanagan: not sure yet what this should return, only there to conform
         #  with Context interface
         return {}
 
-    def status(self):
+    def status(self) -> dict:
         if not self.current_match:
             return
         output = self.current_match.status()
         for listener in self._score_listeners:
             listener.on_match_update(output)
+
+    def overview(self) -> dict:
+        return {}
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
@@ -93,10 +101,11 @@ class MatchEngine(Context):
     def on_match_started(self, mse: MatchStartedEvent):
         self.current_match = Match(mse, self)
         self._child_context = self.current_match
+        return self.current_match.overview()
 
     def on_match_completed(self, mce: MatchCompletedEvent):
         self.current_match.state = mce.reason
-        # TODO pflanagan: send out a message
+        return self.current_match.overview()
 
     def on_client_registered(self, client: "MatchClient"):
         self._score_listeners.append(client)

@@ -27,7 +27,7 @@ class Over(Context, Scoreable):
         self.bowler = bowler
         self.state = OverState.IN_PROGRESS
 
-    def produce_snapshot(self) -> dict:
+    def snapshot(self) -> dict:
         # return runs, boundaries, wickets
         return {}
 
@@ -35,7 +35,7 @@ class Over(Context, Scoreable):
         output = {
             "over_num": self.over_number,
             "bowler": self.bowler.name,
-            "snapshot": self.produce_snapshot(),
+            "snapshot": self.snapshot(),
         }
         return output
 
