@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+from scorpyo.events import InningsStartedEvent
 from scorpyo.innings import Innings
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.static_data.match import FIRST_CLASS
@@ -10,17 +11,17 @@ def test_match_target_single_innings(
     mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
 ):
     mock_innings._score.runs_off_bat = 220
-    assert mock_match.target is None
     mock_match.num_innings_completed += 1
     new_innings = deepcopy(mock_innings)
     new_innings.bowling_team = mock_innings.batting_team
     new_innings.batting_team = mock_innings.bowling_team
+    new_innings.target = mock_match.next_innings_target
     new_innings._score.runs_off_bat = 0
     mock_match.match_inningses.append(new_innings)
     mock_match.num_innings_completed += 1
-    assert mock_match.target == 221
+    assert new_innings.target == 221
     new_innings._score.runs_off_bat = 222
-    assert mock_match.target_reached
+    assert new_innings.target_reached
 
 
 def test_match_target_two_innings(
@@ -41,8 +42,19 @@ def test_match_target_two_innings(
     new_innings._score.runs_off_bat = 150
     mock_match.match_inningses.append(new_innings)
     mock_match.num_innings_completed += 1
+    prev_innings = new_innings
+    # pflanagan: we index innings numbers from 0, so 1 is the second batting innings
+    ise = InningsStartedEvent(
+        3,
+        1,
+        None,
+        prev_innings.bowling_lineup,
+        prev_innings.batting_lineup,
+        prev_innings.batting_lineup[10],
+    )
+    mock_match.on_innings_started(ise)
     assert mock_match.get_team_runs(mock_innings.batting_team, 0) == 220
-    assert mock_match.target == 71
+    assert mock_match.current_innings.target == 71
 
 
 def test_match_target_win_by_an_innings(
@@ -63,7 +75,7 @@ def test_match_target_win_by_an_innings(
     new_innings._score.runs_off_bat = 150
     mock_match.match_inningses.append(new_innings)
     mock_match.num_innings_completed += 1
-    assert mock_match.target_reached
+    assert mock_match.next_innings_target == 0
 
 
 def test_match_target_follow_on(
@@ -84,5 +96,4 @@ def test_match_target_follow_on(
     new_innings._score.runs_off_bat = 350
     mock_match.match_inningses.append(new_innings)
     mock_match.num_innings_completed += 1
-    assert mock_match.target_reached is False
-    assert mock_match.target == 51
+    assert mock_match.next_innings_target == 51

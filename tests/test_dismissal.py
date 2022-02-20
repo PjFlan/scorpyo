@@ -10,7 +10,7 @@ def test_bowled(mock_innings: Innings, registrar: EntityRegistrar):
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.bowler_innings.wickets == 1
     assert mock_innings.on_strike_innings.batting_state == BatterInningsState.DISMISSED
-    assert mock_innings.on_strike_innings.balls_faced() == 1
+    assert mock_innings.on_strike_innings.balls_faced == 1
 
 
 def test_caught(mock_innings: Innings, registrar: EntityRegistrar):

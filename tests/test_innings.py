@@ -1,5 +1,6 @@
 import pytest
 
+from scorpyo.events import InningsCompletedEvent
 from scorpyo.innings import Innings, InningsState, BatterInningsState
 from scorpyo.registrar import EntityRegistrar
 from .conftest import MockMatch
@@ -40,7 +41,7 @@ def test_multiple_deliveries(mock_innings: Innings, registrar: EntityRegistrar):
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.off_strike_innings.runs_scored == 1
     assert mock_innings.on_strike_innings.runs_scored == 2
-    assert mock_innings.bowler_innings.runs_against() == 3
+    assert mock_innings.bowler_innings.runs_against == 3
 
 
 def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):
@@ -52,8 +53,8 @@ def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):
         {"score_text": "2w"},
     ]
     apply_ball_events(payloads, registrar, mock_innings)
-    assert mock_innings.on_strike_innings.balls_faced() == 2
-    assert mock_innings.off_strike_innings.balls_faced() == 2
+    assert mock_innings.on_strike_innings.balls_faced == 2
+    assert mock_innings.off_strike_innings.balls_faced == 2
     assert mock_innings.bowler_innings.balls_bowled == 4
 
 
@@ -74,7 +75,7 @@ def test_innings_completed_all_out(
     actual_atc = [i.player.name for i in mock_innings.active_batter_innings]
     assert set(mock_innings.yet_to_bat) == set(expected_ytb)
     assert set(batters_at_create) == set(actual_atc)
-    payload = {"innings_num": 0, "reason": InningsState.ALL_OUT}
+    payload = {"match_innings_num": 0, "reason": InningsState.ALL_OUT}
     with pytest.raises(AssertionError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match(r"there are still batters remaining")
@@ -90,8 +91,12 @@ def test_innings_completed_all_out(
 
 
 def test_innings_completed_overs_complete(mock_match: MockMatch, mock_innings: Innings):
-    next_bowler = mock_match.apply_overs(mock_match.max_overs - 1)
-    payload = {"over_num": 21, "innings_num": 0, "reason": InningsState.OVERS_COMPLETE}
+    next_bowler = mock_match.apply_overs(mock_match.max_overs() - 1)
+    payload = {
+        "over_num": 21,
+        "match_innings_num": 0,
+        "reason": InningsState.OVERS_COMPLETE,
+    }
     with pytest.raises(AssertionError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("the allotted number of overs has not been bowled")
@@ -101,7 +106,7 @@ def test_innings_completed_overs_complete(mock_match: MockMatch, mock_innings: I
 
 
 def test_innings_completed_wrong_innings(mock_match: MockMatch, mock_innings: Innings):
-    payload = {"innings_num": 1, "reason": InningsState.OVERS_COMPLETE}
+    payload = {"match_innings_num": 1, "reason": InningsState.OVERS_COMPLETE}
     with pytest.raises(ValueError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("the innings number of the InningsCompletedEvent does not match")
@@ -110,21 +115,47 @@ def test_innings_completed_wrong_innings(mock_match: MockMatch, mock_innings: In
 def test_innings_completed_not_in_progress(
     mock_match: MockMatch, mock_innings: Innings
 ):
-    payload = {"innings_num": 0, "reason": InningsState.OVERS_COMPLETE}
+    payload = {"match_innings_num": 0, "reason": InningsState.OVERS_COMPLETE}
     mock_innings.state = InningsState.OVERS_COMPLETE
     with pytest.raises(ValueError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("innings 0 is not in progress")
 
 
-def test_innings_completed_target_reached(
-    mock_match: MockMatch, mock_innings: Innings, monkeypatch
-):
-    monkeypatch.setattr(MockMatch, "target", 100, raising=True)
-    payload = {"innings_num": 0, "reason": InningsState.TARGET_REACHED}
+def test_innings_completed_target_reached(mock_match: MockMatch, mock_innings: Innings):
+    mock_innings.target = 100
+    innings_complete_payload = {
+        "match_innings_num": 0,
+        "reason": InningsState.TARGET_REACHED,
+    }
     with pytest.raises(AssertionError) as exc:
-        mock_match.handle_innings_completed(payload)
+        mock_match.handle_innings_completed(innings_complete_payload)
     assert exc.match("target has not been reached.*target=100 current_score=0")
     mock_innings._score.runs_off_bat = 101
-    mock_match.handle_innings_completed(payload)
-    assert mock_match.current_innings.state == InningsState.TARGET_REACHED
+    mock_match.handle_innings_completed(innings_complete_payload)
+    assert mock_innings.state == InningsState.TARGET_REACHED
+
+
+def test_innings_numbers(mock_match: MockMatch, mock_innings: Innings, monkeypatch):
+    mock_match.max_overs = lambda: 1
+    second_innings_payload = {
+        "batting_team": mock_innings.bowling_team.name,
+        "opening_bowler": mock_innings.batting_lineup[10].name,
+    }
+    ice = InningsCompletedEvent(0, None, InningsState.OVERS_COMPLETE)
+    mock_match.on_innings_completed(ice)
+    mock_match.handle_innings_started(second_innings_payload)
+    second_innings = mock_match.current_innings
+    assert second_innings.match_innings_num == 1
+    assert second_innings.batting_team_innings_num == 0
+    ice = InningsCompletedEvent(1, None, InningsState.OVERS_COMPLETE)
+    mock_match.on_innings_completed(ice)
+    third_innings_payload = {
+        "batting_team": second_innings.bowling_team.name,
+        "opening_bowler": second_innings.batting_lineup[10].name,
+    }
+    mock_match.handle_innings_started(third_innings_payload)
+    third_innings = mock_match.current_innings
+    # pflanagan: we index all innings from 0, so 2 is actually 3
+    assert third_innings.match_innings_num == 2
+    assert third_innings.batting_team_innings_num == 1

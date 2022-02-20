@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
+from scorpyo.context import Context
 from scorpyo.player import Player
 from scorpyo.score import Scoreable
 
@@ -12,18 +13,31 @@ class OverState(Enum):
     INNINGS_ENDED = "ie"
 
 
-class Over(Scoreable):
+class Over(Context, Scoreable):
     def __init__(
         self,
         over_number: int,
         bowler: Player,
         innings: "Innings",
     ):
-        super().__init__()
+        Context.__init__(self)
+        Scoreable.__init__(self)
         self.innings = innings
         self.over_number = over_number
         self.bowler = bowler
         self.state = OverState.IN_PROGRESS
+
+    def produce_snapshot(self) -> dict:
+        # return runs, boundaries, wickets
+        return {}
+
+    def status(self) -> dict:
+        output = {
+            "over_num": self.over_number,
+            "bowler": self.bowler.name,
+            "snapshot": self.produce_snapshot(),
+        }
+        return output
 
     def on_ball_completed(self, bce: "BallCompletedEvent"):
         super().update_score(bce)

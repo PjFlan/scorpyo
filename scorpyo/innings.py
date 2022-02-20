@@ -29,7 +29,10 @@ class Innings(Context, Scoreable):
         self.match = match
         self.start_time = ise.start_time
         self.end_time = None
-        self.innings_num = ise.innings_num
+        self.match_innings_num = ise.match_innings_num
+        self.batting_team_innings_num = ise.batting_team_innings_num
+
+        self.target = None
         self.state = InningsState.IN_PROGRESS
         self.batting_lineup = ise.batting_lineup
         self.bowling_lineup = ise.bowling_lineup
@@ -45,9 +48,12 @@ class Innings(Context, Scoreable):
         self.off_strike_innings = batter_innings_two = BatterInnings(batter_two, self)
         self.bowler_inningses = [self.bowler_innings]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
-        self.ball_in_innings_num = 0
+        self.ball_in_match_innings_num = 0
         self.ball_in_over_num = 0
 
+        # TODO pflanagan: should be able to link the handlers and the status
+        #  dependencies so that the tree is walked automatically based on the handled
+        #  events
         self.add_handler(EventType.BALL_COMPLETED, self.handle_ball_completed)
         self.add_handler(
             EventType.BATTER_INNINGS_STARTED, self.handle_batter_innings_started
@@ -119,8 +125,72 @@ class Innings(Context, Scoreable):
         ]
         return inningses
 
-    def status(self):
-        return f"{self.total_runs}-{self.wickets_down}"
+    @property
+    def overs_bowled(self):
+        overs_completed = (self.ball_in_match_innings_num + 1) // 6
+        assert overs_completed <= len(self.overs), "overs and balls out of sync"
+        return f"{overs_completed}.{self.ball_in_over_num}"
+
+    @property
+    def runs_to_win(self) -> Optional[int]:
+        if self.target is None:
+            return None
+        if self.target <= 0:
+            return 0
+        return max(0, self.target - self.total_runs)
+
+    @property
+    def target_reached(self) -> bool:
+        if self.runs_to_win is None:
+            return False
+        return self.runs_to_win == 0
+
+    def produce_snapshot(self) -> dict:
+        output = {
+            "overs": self.overs_bowled,
+            "on_strike": self.striker.name,
+            "off_strike": self.non_striker.name,
+            "runs": self.runs_scored,
+            "wickets": self.wickets_down,
+            "target": self.target,
+            "runs_to_win": self.runs_to_win,
+        }
+        return output
+
+    def status(self) -> dict:
+        output = {
+            "match_innings_num": self.match_innings_num,
+            "innings_of": self.batting_team,
+            "batting_innings_num": self.batting_team_innings_num,
+            "snapshot": self.produce_snapshot(),
+        }
+        batter_status = []
+        for batting_innings in self.batter_inningses:
+            batter_status.append(batting_innings.status())
+        bowler_status = []
+        for bowler_innings in self.bowler_inningses:
+            bowler_status.append(bowler_innings.status())
+        over_status = []
+        for over in self.overs:
+            over_status.append(over.status())
+        output["bowler_inningses"] = bowler_status
+        output["batter_inningses"] = batter_status
+        output["overs"] = over_status
+        return output
+
+    def ascii_status(self):
+        # TODO pflanagan: should return batters at the crease, current bowler,
+        #  current ball number, total runs, wickets, extras etc.
+        resp = f"{self.total_runs}-{self.wickets_down} after {self.overs_bowled}\n\n"
+        for i, b_innings in enumerate(
+            [self.on_strike_innings, self.off_strike_innings]
+        ):
+            if not b_innings:
+                continue
+            resp += f"{b_innings.player}: {b_innings.status()} \n"
+        resp += "\n"
+        resp += self.current_bowler_innings.status()
+        return resp
 
     def get_batter_innings(self, player: Player) -> "BatterInnings":
         batter_innings = find_innings(player, self.batter_inningses)
@@ -240,7 +310,7 @@ class Innings(Context, Scoreable):
                 f"bowler {bowler} does not play for team {self.bowling_lineup}"
             )
         next_over_num = len(self.overs)
-        max_overs_allowed = self.match.max_overs
+        max_overs_allowed = self.match.max_overs()
         if next_over_num >= max_overs_allowed:
             raise ValueError(
                 f"innings already has max number of overs {max_overs_allowed}"
@@ -252,7 +322,7 @@ class Innings(Context, Scoreable):
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
-        self.ball_in_innings_num += ball_increment
+        self.ball_in_match_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
         self.on_strike_innings.on_ball_completed(bce)
         if bce.dismissal:
@@ -367,17 +437,17 @@ class Innings(Context, Scoreable):
                 f"batter inningses first."
             )
         if ice.reason == InningsState.OVERS_COMPLETE:
-            assert len(self.overs) == self.match.max_overs, (
+            assert len(self.overs) == self.match.max_overs(), (
                 f"the allotted number of overs has not been bowled so cannot "
                 f"end the innings for reason {ice.reason}"
             )
         if ice.reason == InningsState.TARGET_REACHED:
-            if not self.match.target or self.total_runs < self.match.target:
+            if not self.target or self.total_runs < self.target:
                 raise AssertionError(
                     f"there is either no valid target that can be "
                     f"reached in this innings or the target has not "
                     f"been reached, so cannot end the innings for "
-                    f"reason {ice.reason}. target={self.match.target} current_score="
+                    f"reason {ice.reason}. target={self.target} current_score="
                     f"{self.total_runs}"
                 )
         self.state = ice.reason
@@ -394,35 +464,59 @@ class Innings(Context, Scoreable):
             self.handle_batter_innings_completed(payload)
 
 
-class BatterInnings(Scoreable):
+class BatterInnings(Context, Scoreable):
     def __init__(self, player: Player, innings: Innings):
-        super().__init__()
+        Context.__init__(self)
+        Scoreable.__init__(self)
         self.innings = innings
         self.player = player
         self.balls = []
         self.dismissal = None
         self.batting_state = BatterInningsState.IN_PROGRESS
 
-    def on_ball_completed(self, bce: BallCompletedEvent):
-        super().update_score(bce)
-
+    @property
     def balls_faced(self):
         return self._score.valid_deliveries
+
+    def produce_snapshot(self) -> dict:
+        return {}
+
+    def describe_dismissal(self) -> dict:
+        return {}
+
+    def status(self):
+        output = {
+            "player": self.player.name,
+            "snapshot": self.produce_snapshot,
+            "dismissal": self.describe_dismissal(),
+        }
+        return output
 
     def on_dismissal(self, dismissal: Dismissal):
         self.dismissal = dismissal
         self.batting_state = BatterInningsState.DISMISSED
 
+    def on_ball_completed(self, bce: BallCompletedEvent):
+        super().update_score(bce)
 
-class BowlerInnings(Scoreable):
+    def ascii_status(self):
+        on_strike = self == self.innings.on_strike_innings
+        on_strike_token = "*" if on_strike else ""
+        resp = f"{self._score.total_runs}{on_strike_token} ({self.balls_faced})"
+        return resp
+
+
+class BowlerInnings(Context, Scoreable):
     def __init__(self, player: Player, first_over: Over, innings: Innings):
-        super().__init__()
+        Context.__init__(self)
+        Scoreable.__init__(self)
         self.innings = innings
         self.player = player
         self._overs = [first_over]
         self.wickets = 0
         self.overs_completed = 0
 
+    @property
     def runs_against(self):
         return self._score.runs_off_bat + self._score.bowler_extras
 
@@ -431,6 +525,25 @@ class BowlerInnings(Scoreable):
         if not self._overs:
             return None
         return self._overs[-1]
+
+    def produce_snapshot(self) -> dict:
+        # TODO pflanagan: returns overs, balls, wickets, runs against, extras
+        return {}
+
+    def status(self) -> dict:
+        return {}
+
+    def ascii_status(self):
+        balls_in_over = self._score.valid_deliveries % 6
+        overs_completed = self._score.valid_deliveries // 6
+        assert overs_completed >= self.overs_completed, (
+            "bowler overs out of sync " "with balls"
+        )
+        resp = (
+            f"{self.player}: {self.runs_against}-{self.wickets} "
+            f"({self.overs_completed}.{balls_in_over})\n"
+        )
+        return resp
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         curr_over = self.current_over

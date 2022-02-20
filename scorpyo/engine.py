@@ -21,7 +21,7 @@ from scorpyo.static_data.match import get_match_type
 class MatchEngine(Context):
     """
     Receives a stream of match events (commands) and processes the event
-    based on its internal state, then sends out a corresponding event message
+    based on its internal state, then sends out a corresponding message
     that other applications (client, score reporter) can listen for
     """
 
@@ -32,22 +32,29 @@ class MatchEngine(Context):
         self.current_match = None
         self.state: EngineState = EngineState.LOCKED
         self._events = []
-        self._clients = []
+        self._score_listeners = []
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
-    def on_event(self, event_type: EventType, event_message: dict):
-        new_event = self.handle_event(event_type, event_message)
-        self._events.append(new_event)
-        self.publish_score_update()
+    def on_event(self, event_type: EventType, event_payload: dict):
+        # TODO pflanagan: need to upgrade all the handlers to send a message back as
+        #  part of their processing
+        self._events.append(event_payload)
+        event_message = self.handle_event(event_type, event_payload)
+        return event_message
 
-    def publish_score_update(self):
+    def produce_snapshot(self) -> dict:
+        # TODO pflanagan: not sure yet what this should return, only there to conform
+        #  with Context interface
+        return {}
+
+    def status(self):
         if not self.current_match:
             return
-        score_status = self.current_match.status()
-        for client in self._clients:
-            client.on_match_update(score_status)
+        output = self.current_match.status()
+        for listener in self._score_listeners:
+            listener.on_match_update(output)
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
@@ -92,7 +99,7 @@ class MatchEngine(Context):
         # TODO pflanagan: send out a message
 
     def on_client_registered(self, client: "MatchClient"):
-        self._clients.append(client)
+        self._score_listeners.append(client)
 
 
 class EngineState(enum.Enum):

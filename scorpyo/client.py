@@ -6,7 +6,7 @@ from io import IOBase
 from typing import List, MutableSequence
 
 from scorpyo.context import Context
-from scorpyo.engine import MatchEngine, EngineState
+from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
 from scorpyo.events import EventType
 from scorpyo.registrar import EntityRegistrar
@@ -24,7 +24,7 @@ now the client can read in this info on startup each time and keep in memory
 class MatchClient:
     def __init__(self, engine: MatchEngine = None):
         self.engine: MatchEngine = engine
-        self.registrar: EntityRegistrar = None
+        self.registrar = None
         self._sources: List[InputSource] = []
         self._pending_events = []
 
@@ -101,7 +101,7 @@ class MatchClient:
         self.engine.on_event(event_type, event)
         self._pending_events.append(event)
 
-    def on_match_status(self, status: str):
+    def on_match_update(self, status: dict):
         print(status)
 
     @contextmanager
@@ -157,7 +157,7 @@ class FileSource(InputSource):
     def __init__(self, url: str, reader=None):
         super().__init__()
         self.URL: str = url
-        self.file_handler: IOBase = None
+        self.file_handler = None
         self.reader = reader
 
     def connect(self):

@@ -163,7 +163,7 @@ def test_over_started_same_bowler(mock_innings: Innings, registrar: EntityRegist
 def test_over_started_exceeds_limit(mock_innings: Innings, registrar: EntityRegistrar):
     # patch this with a larger bowler limit as will test this logic separately
     mock_innings.match.match_type = MatchType(1, 20, 1, 10)
-    max_overs = mock_innings.match.max_overs
+    max_overs = mock_innings.match.max_overs()
     bowlers = [mock_innings.current_bowler.name, "JJ Cassidy"]
     last_bowler_idx = rotate_bowlers(mock_innings, registrar, bowlers, max_overs)
     assert len(mock_innings.overs) == max_overs

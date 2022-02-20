@@ -41,7 +41,7 @@ def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     away_lineup_payload = {"team": "away", "lineup": AWAY_PLAYERS}
     mock_engine.current_match.handle_team_lineup(home_lineup_payload)
     mock_engine.current_match.handle_team_lineup(away_lineup_payload)
-    assert mock_engine.current_match.max_overs == 20
+    assert mock_engine.current_match.max_overs() == 20
     assert mock_engine.current_match.home_team.name == HOME_TEAM
     assert mock_engine.current_match.match_id == 0
     assert mock_engine.current_match.state == MatchState.IN_PROGRESS
@@ -59,5 +59,6 @@ def test_new_innings(registrar, mock_match):
     mock_match.handle_innings_started(payload)
     assert len(mock_match.match_inningses) == 1
     current_innings = mock_match.current_innings
-    assert current_innings.innings_num == 0
+    assert current_innings.match_innings_num == 0
     assert current_innings.current_over.over_number == 0
+    assert current_innings.batting_team_innings_num == 0

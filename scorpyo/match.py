@@ -42,10 +42,6 @@ class Match(Context, Scoreable):
         self.add_handler(EventType.REGISTER_LINE_UP, self.handle_team_lineup)
 
     @property
-    def max_overs(self) -> int:
-        return self.match_type.overs
-
-    @property
     def max_bowler_overs(self) -> int:
         return self.match_type.bowler_limit
 
@@ -65,55 +61,55 @@ class Match(Context, Scoreable):
     def current_innings(self) -> Optional[Innings]:
         if len(self.match_inningses) == 0:
             return None
+        if len(self.match_inningses) == self.num_innings_completed:
+            return None
         return self.match_inningses[-1]
 
     @property
-    def target(self) -> Optional[int]:
-        if self.match_type.innings_per_side == 1:
+    def target(self):
+        if not self.current_innings:
+            return None
+        return self.current_innings.target
+
+    @property
+    def next_innings_target(self) -> Optional[int]:
+        if self.max_inningses == 1:
             if self.num_innings_completed == 0:
                 return None
             else:
-                return self.match_inningses[0]() + 1
+                return self.innings_by_number(1)._score.total_runs + 1
         elif self.num_innings_completed < 3:
             return None
-        bowling_team = self.current_innings.bowling_team
-        batting_team = self.current_innings.batting_team
-        if len(self.match_inningses) == 3:
-            # PF: if we have not yet started the 4th innings we need to make sure
-            # we preempt who will be the batting and bowling teams
-            bowling_team = (
-                self.current_innings.batting_team
-                if len(self.match_inningses) == 3
-                else bowling_team
-            )
-            batting_team = (
-                self.current_innings.bowling_team
-                if len(self.match_inningses) == 3
-                else batting_team
-            )
-        batting_team_first_inn_runs = self.get_team_runs(batting_team, 0)
-        bowling_team_total_runs = self.get_team_runs(bowling_team)
-        return max(0, bowling_team_total_runs + 1 - batting_team_first_inn_runs)
+        third_innings = self.innings_by_number(3)
+        next_bowling_team = third_innings.batting_team
+        next_batting_team = third_innings.bowling_team
+        next_batting_team_first_inn_runs = self.get_team_runs(next_batting_team, 0)
+        next_bowling_team_total_runs = self.get_team_runs(next_bowling_team)
+        return max(
+            0, next_bowling_team_total_runs + 1 - next_batting_team_first_inn_runs
+        )
 
-    @property
-    def runs_to_win(self) -> Optional[int]:
-        if self.target is None:
+    # pflanagan: should really be a property but makes testing annoying
+    def max_overs(self) -> int:
+        return self.match_type.overs
+
+    def innings_by_number(self, match_innings_num: int) -> Optional[Innings]:
+        # here match_innings_num is the human version i.e. starts from 1
+        computer_num = match_innings_num - 1
+        if computer_num >= len(self.match_inningses):
             return None
-        if self.target <= 0:
-            return 0
-        if self.match_type.innings_per_side == 2 and len(self.match_inningses) == 3:
-            return self.target
-        return max(0, self.target - self.current_innings.total_runs)
+        return self.match_inningses[computer_num]
 
-    @property
-    def target_reached(self) -> bool:
-        if self.runs_to_win is None:
-            return False
-        return self.runs_to_win == 0
+    def status(self) -> dict:
+        inningses_status = []
+        output = {"match_id": self.match_id, "snapshot": self.produce_snapshot()}
+        for innings in enumerate(self.match_inningses):
+            inningses_status.append(innings.status())
+        output["inningses"] = inningses_status
+        return output
 
-    def status(self):
-        for i, innings in enumerate(self.match_inningses):
-            print(f"innings {i}: {innings.status()}\n")
+    def produce_snapshot(self):
+        return ""
 
     def get_lineup(self, team: Team) -> Optional[MatchTeam]:
         for lineup in self.lineups:
@@ -144,8 +140,16 @@ class Match(Context, Scoreable):
 
     def handle_innings_started(self, payload: dict):
         start_time = util.get_current_time()
+        assert self.num_innings_completed == len(self.match_inningses)
         # index innings from 0 not 1
-        innings_num = self.num_innings_completed
+        match_innings_num = self.num_innings_completed
+        if (
+            self.current_innings
+            and self.current_innings.state == InningsState.IN_PROGRESS
+        ):
+            raise ValueError(
+                "cannot start an innings while another one is still in progress."
+            )
         if not self.home_lineup or not self.away_lineup:
             raise ValueError(
                 "cannot start an innings without first defining the "
@@ -164,13 +168,17 @@ class Match(Context, Scoreable):
         opening_bowler = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["opening_bowler"]
         )
+        num_prev_batting_inningses = len(
+            [i for i in self.match_inningses if i.batting_team == batting_team]
+        )
         if opening_bowler not in bowling_lineup:
             raise ValueError(
                 f"no bowler in bowling team {bowling_lineup.name} with "
                 f"name {opening_bowler.name}"
             )
         ise = InningsStartedEvent(
-            innings_num,
+            match_innings_num,
+            num_prev_batting_inningses,
             start_time,
             batting_lineup,
             bowling_lineup,
@@ -182,7 +190,7 @@ class Match(Context, Scoreable):
     def handle_innings_completed(self, payload: dict):
         end_time = util.get_current_time()
         reason = InningsState(payload["reason"])
-        innings_id = payload["innings_num"]
+        innings_id = payload["match_innings_num"]
         ice = InningsCompletedEvent(innings_id, end_time, reason)
         self.on_innings_completed(ice)
         return ice
@@ -204,6 +212,7 @@ class Match(Context, Scoreable):
 
     def on_innings_started(self, ise: InningsStartedEvent):
         new_innings = Innings(ise, self)
+        new_innings.target = self.next_innings_target
         self.add_innings(new_innings)
         self._child_context = new_innings
 
@@ -215,16 +224,16 @@ class Match(Context, Scoreable):
             )
         if self.current_innings.state != InningsState.IN_PROGRESS:
             raise ValueError(
-                f"innings {current_innings.innings_num} is not in "
+                f"innings {current_innings.match_innings_num} is not in "
                 f"progress so cannot complete it"
             )
-        if current_innings.innings_num != ice.innings_num:
+        if current_innings.match_innings_num != ice.match_innings_num:
             raise ValueError(
                 f"the innings number of the InningsCompletedEvent does "
                 f"not match the current_innings number"
             )
-        self.num_innings_completed += 1
         self.current_innings.on_innings_completed(ice)
+        self.num_innings_completed += 1
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
