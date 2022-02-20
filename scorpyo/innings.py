@@ -178,6 +178,9 @@ class Innings(Context, Scoreable):
         output["overs"] = over_status
         return output
 
+    def overview(self) -> dict:
+        return {}
+
     def ascii_status(self):
         # TODO pflanagan: should return batters at the crease, current bowler,
         #  current ball number, total runs, wickets, extras etc.
@@ -498,6 +501,9 @@ class BatterInnings(Context, Scoreable):
         }
         return output
 
+    def overview(self) -> dict:
+        return {}
+
     def on_dismissal(self, dismissal: Dismissal):
         self.dismissal = dismissal
         self.batting_state = BatterInningsState.DISMISSED
@@ -537,6 +543,9 @@ class BowlerInnings(Context, Scoreable):
         return {}
 
     def status(self) -> dict:
+        return {}
+
+    def overview(self) -> dict:
         return {}
 
     def ascii_status(self):

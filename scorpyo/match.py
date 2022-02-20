@@ -22,6 +22,10 @@ from scorpyo.team import Team, MatchTeam
 # TODO pflanagan: I don't like multiple inheritance here
 # eventually will probably need to create a new MatchContext
 # class, separate from Match
+
+# TODO pflanagan: untangle the status, snapshot, overview mess. I think an event either
+# returns a snapshot, or an overview (which is a full scorecard essentially). Can then
+# also add an api to allow the client to request an overview
 class Match(Context, Scoreable):
     def __init__(self, mse: MatchStartedEvent, match_engine: "MatchEngine"):
         Context.__init__(self)

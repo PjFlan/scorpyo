@@ -42,14 +42,14 @@ class MatchStartedEvent(NamedTuple):
     start_time: float
     home_team: Team
     away_team: Team
-    event_message = EventMessageType.MATCH_STARTED
+    event_message = EventMessageType.MATCH_OVERVIEW
 
 
 class MatchCompletedEvent(NamedTuple):
     match_id: int
     end_time: float
     reason: "MatchState"
-    event_message = EventMessageType.MATCH_COMPLETED
+    event_message = EventMessageType.MATCH_OVERVIEW
 
 
 class InningsStartedEvent(NamedTuple):
@@ -66,7 +66,7 @@ class InningsCompletedEvent(NamedTuple):
     match_innings_num: int
     end_time: float
     reason: "InningsState"
-    event_message = EventMessageType.INNINGS_COMPLETED
+    event_message = EventMessageType.INNINGS_OVERVIEW
 
 
 class BallCompletedEvent(NamedTuple):
@@ -82,25 +82,25 @@ class BallCompletedEvent(NamedTuple):
 class BatterInningsCompletedEvent(NamedTuple):
     batter: Player
     batting_state: "BatterInningsState"
-    event_message = EventMessageType.BATTER_INNINGS_COMPLETED
+    event_message = EventMessageType.BATTER_INNINGS_OVERVIEW
 
 
 class BatterInningsStartedEvent(NamedTuple):
     batter: Player
-    event_message = EventMessageType.INNINGS_STARTED
+    event_message = EventMessageType.INNINGS_OVERVIEW
 
 
 class OverCompletedEvent(NamedTuple):
     number: int
     bowler: Player
     reason: "OverState"
-    event_message = EventMessageType.OVER_COMPLETED
+    event_message = EventMessageType.OVER_OVERVIEW
 
 
 class OverStartedEvent(NamedTuple):
     bowler: Player
     over_number: int
-    event_message = EventMessageType.INNINGS_STARTED
+    event_message = EventMessageType.INNINGS_OVERVIEW
 
 
 class RegisterTeamLineup(NamedTuple):

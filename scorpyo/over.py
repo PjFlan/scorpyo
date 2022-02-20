@@ -39,6 +39,9 @@ class Over(Context, Scoreable):
         }
         return output
 
+    def overview(self) -> dict:
+        return {}
+
     def on_ball_completed(self, bce: "BallCompletedEvent"):
         super().update_score(bce)
 
