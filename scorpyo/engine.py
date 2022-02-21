@@ -9,6 +9,7 @@ from scorpyo.events import (
     MatchCompletedEvent,
 )
 import scorpyo.util as util
+from scorpyo.registrar import EventRegistrar
 from scorpyo.static_data.match import get_match_type
 
 
@@ -37,6 +38,8 @@ class MatchEngine(Context):
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
+
+        Context.assure_event_registrar()
 
     def on_event(self, event_type: EventType, event_payload: dict):
         self._events.append(event_payload)

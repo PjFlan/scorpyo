@@ -77,11 +77,10 @@ class MockMatch(Match):
 
 @pytest.fixture()
 def registrar():
-    registrar = EntityRegistrar()
-    registrar.create_team(test_team_home)
-    registrar.create_team(test_team_away)
-    Context.set_entity_registrar(registrar)
-    return registrar
+    ent_registrar = Context.assure_entity_registrar()
+    ent_registrar.create_team(test_team_home)
+    ent_registrar.create_team(test_team_away)
+    return ent_registrar
 
 
 @pytest.fixture()

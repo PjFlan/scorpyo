@@ -47,7 +47,12 @@ class EntityRegistrar:
 
 class EventRegistrar:
     def __init__(self):
-        self._events = []
+        self._store = []
 
     def add(self, event):
-        self._events.append(event)
+        self._store.append(event)
+
+    def peek(self):
+        if len(self._store) > 0:
+            return self._store[-1]
+        return None

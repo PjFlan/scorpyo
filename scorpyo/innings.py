@@ -4,7 +4,7 @@ import enum
 from typing import Optional, List
 
 import scorpyo.util as util
-from scorpyo.context import Context
+from scorpyo.context import Context, record_event
 from scorpyo.dismissal import Dismissal, parse_dismissal
 from scorpyo.events import (
     BallCompletedEvent,
@@ -145,41 +145,47 @@ class Innings(Context, Scoreable):
             return False
         return self.runs_to_win == 0
 
-    def snapshot(self) -> dict:
-        output = {
-            "overs": self.overs_bowled,
-            "on_strike": self.striker.name,
-            "off_strike": self.non_striker.name,
-            "runs": self.runs_scored,
-            "wickets": self.wickets_down,
-            "target": self.target,
-            "runs_to_win": self.runs_to_win,
-        }
-        return output
-
-    def status(self) -> dict:
+    def description(self) -> dict:
         output = {
             "match_innings_num": self.match_innings_num,
             "innings_of": self.batting_team,
             "batting_innings_num": self.batting_team_innings_num,
-            "snapshot": self.snapshot(),
+            "target": self.target,
         }
+        return output
+
+    def snapshot(self) -> dict:
+        output = {
+            "overs": self.overs_bowled,
+            "runs": self.runs_scored,
+            "wickets": self.wickets_down,
+            "runs_to_win": self.runs_to_win,
+        }
+        if self.on_strike_innings:
+            output["on_strike"] = self.on_strike_innings.snapshot()
+        if self.off_strike_innings:
+            output["off_strike"] = self.off_strike_innings.snapshot()
+        if self.current_bowler_innings:
+            output["bowler"] = self.current_bowler_innings.snapshot()
+        if self.current_over:
+            output["current_over"] = self.current_over.snapshot()
+        return output
+
+    def overview(self):
+        output = {"description": self.description(), "snapshot": self.snapshot()}
         batter_status = []
         for batting_innings in self.batter_inningses:
-            batter_status.append(batting_innings.status())
+            batter_status.append(batting_innings.overview())
         bowler_status = []
         for bowler_innings in self.bowler_inningses:
-            bowler_status.append(bowler_innings.status())
+            bowler_status.append(bowler_innings.overview())
         over_status = []
         for over in self.overs:
-            over_status.append(over.status())
+            over_status.append(over.overview())
         output["bowler_inningses"] = bowler_status
         output["batter_inningses"] = batter_status
         output["overs"] = over_status
         return output
-
-    def overview(self) -> dict:
-        return {}
 
     def ascii_status(self):
         # TODO pflanagan: should return batters at the crease, current bowler,
@@ -207,7 +213,7 @@ class Innings(Context, Scoreable):
         # number should be indexed from 0
         return self.overs[number]
 
-    def handle_ball_completed(self, payload: dict):
+    def handle_ball_completed(self, payload: dict) -> dict:
         ball_score = Score.parse(payload["score_text"])
         dismissal_payload = dismissal = None
         on_strike_player = self.striker
@@ -249,10 +255,9 @@ class Innings(Context, Scoreable):
             players_crossed,
             dismissal,
         )
-        self.on_ball_completed(bce)
-        return bce
+        return self.on_ball_completed(bce)
 
-    def handle_batter_innings_started(self, payload: dict):
+    def handle_batter_innings_started(self, payload: dict) -> dict:
         batter = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["batter"]
         )
@@ -264,19 +269,17 @@ class Innings(Context, Scoreable):
                     "cannot process new batter innings as there are no players left"
                 )
         bis = BatterInningsStartedEvent(batter)
-        self.on_batter_innings_started(bis)
-        return bis
+        return self.on_batter_innings_started(bis)
 
-    def handle_batter_innings_completed(self, payload: dict):
+    def handle_batter_innings_completed(self, payload: dict) -> dict:
         batter = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["batter"]
         )
         state = BatterInningsState(payload["reason"])
         bic = BatterInningsCompletedEvent(batter, state)
-        self.on_batter_innings_completed(bic)
-        return bic
+        return self.on_batter_innings_completed(bic)
 
-    def handle_over_completed(self, payload: dict):
+    def handle_over_completed(self, payload: dict) -> dict:
         if "bowler" not in payload:
             raise ValueError("must specify bowler of completed over")
         bowler = self.entity_registrar.get_entity_data(
@@ -299,10 +302,9 @@ class Innings(Context, Scoreable):
             )
         over_number = payload["over_num"]
         oc = OverCompletedEvent(over_number, bowler, reason)
-        self.on_over_completed(oc)
-        return oc
+        return self.on_over_completed(oc)
 
-    def handle_over_started(self, payload: dict):
+    def handle_over_started(self, payload: dict) -> dict:
         if "bowler" not in payload:
             raise ValueError("must specify bowler of new over")
         bowler = self.entity_registrar.get_entity_data(
@@ -319,9 +321,9 @@ class Innings(Context, Scoreable):
                 f"innings already has max number of overs {max_overs_allowed}"
             )
         os = OverStartedEvent(bowler, next_over_num)
-        self.on_over_started(os)
-        return os
+        return self.on_over_started(os)
 
+    @record_event
     def on_ball_completed(self, bce: BallCompletedEvent) -> dict:
         super().update_score(bce)
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
@@ -340,8 +342,9 @@ class Innings(Context, Scoreable):
             self.on_strike_innings, self.off_strike_innings = util.switch_strike(
                 self.on_strike_innings, self.off_strike_innings
             )
-        return self.status()
+        return self.snapshot()
 
+    @record_event
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent) -> dict:
         if self.on_strike_innings and self.off_strike_innings:
             raise ValueError(
@@ -366,8 +369,9 @@ class Innings(Context, Scoreable):
             self.on_strike_innings = new_innings
         else:
             self.off_strike_innings = new_innings
-        return new_innings.overview()
+        return new_innings.description()
 
+    @record_event
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent) -> dict:
         if bic.batter not in self.batting_lineup:
             raise ValueError(
@@ -401,6 +405,7 @@ class Innings(Context, Scoreable):
             self.off_strike_innings = None
         return dismissed_innings.overview()
 
+    @record_event
     def on_over_completed(self, oc: OverCompletedEvent) -> dict:
         self.on_strike_innings, self.off_strike_innings = util.switch_strike(
             self.on_strike_innings, self.off_strike_innings
@@ -409,6 +414,7 @@ class Innings(Context, Scoreable):
         self.current_bowler_innings.on_over_completed(oc)
         return self.current_over.overview()
 
+    @record_event
     def on_over_started(self, os: OverStartedEvent) -> dict:
         if os.bowler == self.current_bowler:
             raise ValueError("bowler {player} cannot bowl two overs in a row")
@@ -431,9 +437,9 @@ class Innings(Context, Scoreable):
             )
         self.bowler_innings = bowler_innings
         bowler_innings.on_over_started(os)
-        return new_over.overview()
+        return new_over.description()
 
-    def on_innings_completed(self, ice: InningsCompletedEvent) -> dict:
+    def terminate(self, ice: InningsCompletedEvent):
         if ice.reason == InningsState.ALL_OUT:
             assert len(self.yet_to_bat) == 0, (
                 f"there are still batters remaining so cannot end the "
@@ -470,7 +476,6 @@ class Innings(Context, Scoreable):
                 "reason": BatterInningsState.INNINGS_COMPLETE.value,
             }
             self.handle_batter_innings_completed(payload)
-        return self.overview()
 
 
 class BatterInnings(Context, Scoreable):
@@ -487,21 +492,22 @@ class BatterInnings(Context, Scoreable):
     def balls_faced(self):
         return self._score.valid_deliveries
 
+    def description(self) -> dict:
+        return {}
+
     def snapshot(self) -> dict:
         return {}
 
-    def describe_dismissal(self) -> dict:
+    def overview(self) -> dict:
+        output = {
+            "description": self.description(),
+            "snapshot": self.snapshot(),
+            "dismissal": self.dismissal_description(),
+        }
+        # needs to return dismissal description where applicable
         return {}
 
-    def status(self):
-        output = {
-            "player": self.player.name,
-            "snapshot": self.snapshot,
-            "dismissal": self.describe_dismissal(),
-        }
-        return output
-
-    def overview(self) -> dict:
+    def dismissal_description(self) -> dict:
         return {}
 
     def on_dismissal(self, dismissal: Dismissal):
@@ -538,14 +544,17 @@ class BowlerInnings(Context, Scoreable):
             return None
         return self._overs[-1]
 
-    def snapshot(self) -> dict:
-        # TODO pflanagan: returns overs, balls, wickets, runs against, extras
+    def description(self) -> dict:
         return {}
 
-    def status(self) -> dict:
+    def snapshot(self) -> dict:
         return {}
 
     def overview(self) -> dict:
+        output = {
+            "description": self.description(),
+            "snapshot": self.snapshot(),
+        }
         return {}
 
     def ascii_status(self):

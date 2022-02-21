@@ -61,9 +61,7 @@ class MatchClient:
         self._sources = sources
 
     def on_entity_message(self, message: dict):
-        if not self.registrar:
-            self.registrar = EntityRegistrar()
-            Context.set_entity_registrar(self.registrar)
+        self.registrar = Context.assure_entity_registrar()
         e_type = message.get("entity_type")
         if not e_type:
             raise ValueError(f"entity message is missing entity type {message}")

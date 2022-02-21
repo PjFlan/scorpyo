@@ -2,7 +2,7 @@ import enum
 from typing import Optional, List
 
 import scorpyo.util as util
-from scorpyo.context import Context
+from scorpyo.context import Context, record_event
 from scorpyo.events import (
     BallCompletedEvent,
     BatterInningsCompletedEvent,
@@ -200,8 +200,7 @@ class Match(Context, Scoreable):
             bowling_lineup,
             opening_bowler,
         )
-        self.on_innings_started(ise)
-        message = self.current_innings.overview()
+        message = self.on_innings_started(ise)
         return message
 
     def handle_innings_completed(self, payload: dict):
@@ -209,8 +208,7 @@ class Match(Context, Scoreable):
         reason = InningsState(payload["reason"])
         innings_id = payload["match_innings_num"]
         ice = InningsCompletedEvent(innings_id, end_time, reason)
-        self.on_innings_completed(ice)
-        message = self.match_inningses[-1].overview()
+        message = self.on_innings_completed(ice)
         return message
 
     def handle_team_lineup(self, payload: dict):
@@ -235,47 +233,44 @@ class Match(Context, Scoreable):
         }
         return message
 
+    @record_event
     def on_innings_started(self, ise: InningsStartedEvent):
         new_innings = Innings(ise, self)
         new_innings.target = self.next_innings_target
         self.add_innings(new_innings)
         self._child_context = new_innings
-        message = self.current_innings.overview()
-        return message
+        return self.current_innings.description()
 
+    @record_event
     def on_innings_completed(self, ice: InningsCompletedEvent):
-        current_innings = self.current_innings
-        if not current_innings:
+        innings = self.current_innings
+        if not innings:
             raise ValueError(
                 f"cannot complete an innings when there are no existing " f"inningses"
             )
         if self.current_innings.state != InningsState.IN_PROGRESS:
             raise ValueError(
-                f"innings {current_innings.match_innings_num} is not in "
+                f"innings {innings.match_innings_num} is not in "
                 f"progress so cannot complete it"
             )
-        if current_innings.match_innings_num != ice.match_innings_num:
+        if innings.match_innings_num != ice.match_innings_num:
             raise ValueError(
                 f"the innings number of the InningsCompletedEvent does "
                 f"not match the current_innings number"
             )
-        self.current_innings.on_innings_completed(ice)
+        innings.terminate(ice)
         self.num_innings_completed += 1
-        message = self.match_inningses[-1].overview()
-        return message
+        return innings.overview()
 
     def on_ball_completed(self, bce: BallCompletedEvent):
         super().update_score(bce)
-        message = self.current_innings.on_ball_completed(bce)
-        return message
+        return self.current_innings.on_ball_completed(bce)
 
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent):
-        message = self.current_innings.on_batter_innings_completed(bic)
-        return message
+        return self.current_innings.on_batter_innings_completed(bic)
 
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
-        message = self.current_innings.on_batter_innings_started(bis)
-        return message
+        return self.current_innings.on_batter_innings_started(bis)
 
 
 class MatchState(enum.Enum):

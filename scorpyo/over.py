@@ -27,20 +27,19 @@ class Over(Context, Scoreable):
         self.bowler = bowler
         self.state = OverState.IN_PROGRESS
 
+    def description(self) -> dict:
+        return {}
+
     def snapshot(self) -> dict:
         # return runs, boundaries, wickets
         return {}
 
-    def status(self) -> dict:
+    def overview(self) -> dict:
         output = {
-            "over_num": self.over_number,
-            "bowler": self.bowler.name,
+            "description": self.description(),
             "snapshot": self.snapshot(),
         }
         return output
-
-    def overview(self) -> dict:
-        return {}
 
     def on_ball_completed(self, bce: "BallCompletedEvent"):
         super().update_score(bce)
