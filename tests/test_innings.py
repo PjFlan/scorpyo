@@ -44,7 +44,7 @@ def test_multiple_deliveries(mock_innings: Innings, registrar: EntityRegistrar):
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.off_strike_innings.runs_scored == 1
     assert mock_innings.on_strike_innings.runs_scored == 2
-    assert mock_innings.bowler_innings.runs_against == 3
+    assert mock_innings.bowler_innings._score.runs_against_bowler == 3
 
 
 def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):

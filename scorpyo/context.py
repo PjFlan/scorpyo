@@ -8,10 +8,6 @@ def record_event(func: callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
         event_registrar = Context.assure_event_registrar()
-        if len(args) < 2:
-            print(args)
-        else:
-            print(args)
         event_registrar.add(args[1])  # first arg would be self
         return func(*args, **kwargs)
 

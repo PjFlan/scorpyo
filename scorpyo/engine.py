@@ -27,7 +27,7 @@ class MatchEngine(Context):
     """
 
     match_id = 0
-    event_id = 0
+    message_id = 0
 
     def __init__(self):
         super().__init__()
@@ -41,31 +41,36 @@ class MatchEngine(Context):
 
         Context.assure_event_registrar()
 
-    def on_event(self, event_type: EventType, event_payload: dict):
-        self._events.append(event_payload)
-        event_message = self.handle_event(event_type, event_payload)
+    def on_event(self, event_command: dict):
+        event_type = event_command.get("event_type")
+        if not event_type:
+            raise ValueError(
+                f"no event_type specified on incoming command " f"{event_command}"
+            )
+        self._events.append(event_command)
+        event_message = self.handle_event(event_type, event_command["body"])
         message = {
             "event_type": event_type.value,
-            "event_id": self.event_id,
+            "message_id": self.message_id,
             "message": event_message,
         }
-        self.event_id += 1
-        return message
+        self.message_id += 1
+        self.send_message(message)
+
+    def description(self) -> dict:
+        return {"engine_user": "pflanagan"}
 
     def snapshot(self) -> dict:
         # TODO pflanagan: not sure yet what this should return, only there to conform
         #  with Context interface
         return {}
 
-    def status(self) -> dict:
-        if not self.current_match:
-            return
-        output = self.current_match.status()
-        for listener in self._score_listeners:
-            listener.on_match_update(output)
-
     def overview(self) -> dict:
-        return {}
+        return {"description": self.description(), "overview": self.overview()}
+
+    def send_message(self, message: dict):
+        for listener in self._score_listeners:
+            listener.on_message(message)
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
@@ -86,8 +91,8 @@ class MatchEngine(Context):
             EntityType.TEAM, payload["away_team"]
         )
         mse = MatchStartedEvent(match_id, match_type, start_time, home_team, away_team)
-        self.on_match_started(mse)
-        return mse
+        message = self.on_match_started(mse)
+        return message
 
     def handle_match_completed(self, payload: dict):
         end_time = util.get_current_time()
@@ -110,7 +115,7 @@ class MatchEngine(Context):
         self.current_match.state = mce.reason
         return self.current_match.overview()
 
-    def on_client_registered(self, client: "MatchClient"):
+    def register_client(self, client: "MatchClient"):
         self._score_listeners.append(client)
 
 

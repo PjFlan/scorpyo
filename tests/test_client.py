@@ -8,7 +8,7 @@ import pytest
 from scorpyo.client import MatchClient, FileSource, json_reader, plain_reader
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
-from scorpyo.events import EventType
+from scorpyo.events import EventType, MatchStartedEvent
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
@@ -66,10 +66,10 @@ def test_file_source_plain_reader(monkeypatch, mock_file):
     file_source.connect()
     mock_file.write_lines(LINES[0:2])
     file_source.read()
-    assert len(file_source.message_buffer) == 2
+    assert len(file_source.command_buffer) == 2
     mock_file.write(LINES[2])
     file_source.read()
-    assert len(file_source.message_buffer) == 3
+    assert len(file_source.command_buffer) == 3
     read_lines = []
     for line in file_source.query():
         read_lines.append(line)
@@ -83,7 +83,7 @@ def test_file_source_json_reader(monkeypatch, mock_file):
     file_source.connect()
     mock_file.write(TEST_JSON)
     file_source.read()
-    assert len(file_source.message_buffer) == 3
+    assert len(file_source.command_buffer) == 3
     read_lines = []
     for line in file_source.query():
         read_lines.append(line)
@@ -94,7 +94,7 @@ def test_file_source_json_reader(monkeypatch, mock_file):
 def test_client_plain_reader(mock_client, mock_file, mocker, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_file.write_lines(LINES)
-    patched = mocker.patch.object(MatchClient, "handle_message")
+    patched = mocker.patch.object(MatchClient, "handle_command")
     with mock_client.connect() as client:
         client.read()
     assert mock_client._sources[0].has_data()
@@ -107,7 +107,7 @@ def test_client_json_reader(mock_client, mock_file, mocker, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_client._sources[0].reader = json_reader
     mock_file.write(TEST_JSON)
-    patched = mocker.patch.object(MatchClient, "handle_message")
+    patched = mocker.patch.object(MatchClient, "handle_command")
     with mock_client.connect() as client:
         client.read()
     assert mock_client._sources[0].has_data()
@@ -116,65 +116,65 @@ def test_client_json_reader(mock_client, mock_file, mocker, monkeypatch):
     assert not mock_client._sources[0].has_data()
 
 
-def test_message_handler(mock_client, mocker):
-    test_message_1 = {"message_type": "entity", "body": {"dummy1": "test"}}
-    entity_patch = mocker.patch.object(MatchClient, "on_entity_message")
-    event_patch = mocker.patch.object(MatchClient, "on_event_message")
-    mock_client.handle_message(test_message_1)
-    assert entity_patch.called_with(test_message_1["body"])
-    test_message_2 = {"message_type": "event", "body": {"dummy2": "test"}}
-    mock_client.handle_message(test_message_2)
-    assert event_patch.called_with(test_message_2["body"])
+def test_command_handler(mock_client, mocker):
+    test_command_1 = {"command_type": "entity", "body": {"dummy1": "test"}}
+    entity_patch = mocker.patch.object(MatchClient, "on_entity_command")
+    event_patch = mocker.patch.object(MatchClient, "on_event_command")
+    mock_client.handle_command(test_command_1)
+    assert entity_patch.called_with(test_command_1["body"])
+    test_command_2 = {"command_type": "event", "body": {"dummy2": "test"}}
+    mock_client.handle_command(test_command_2)
+    assert event_patch.called_with(test_command_2["body"])
 
 
-def test_message_handler_errors(mock_client):
+def test_command_handler_errors(mock_client):
     with pytest.raises(ValueError):
-        bad_message = {"message_type": "not exist", "body": "nothing"}
-        mock_client.handle_message(bad_message)
+        bad_command = {"command_type": "not exist", "body": "nothing"}
+        mock_client.handle_command(bad_command)
     with pytest.raises(ValueError):
-        bad_message = {"message_type": "entity"}
-        mock_client.handle_message(bad_message)
+        bad_command = {"command_type": "entity"}
+        mock_client.handle_command(bad_command)
     with pytest.raises(ValueError):
-        bad_message = {"body": "data"}
-        mock_client.handle_message(bad_message)
+        bad_command = {"body": "data"}
+        mock_client.handle_command(bad_command)
 
 
-def test_entity_player_message(mock_client):
+def test_entity_player_command(mock_client):
     test_player = "Padraic Flanagan"
-    entity_player_message = {
-        "message_type": "entity",
+    entity_player_command = {
+        "command_type": "entity",
         "body": {"entity_type": "player", "name": test_player},
     }
-    mock_client.handle_message(entity_player_message)
+    mock_client.handle_command(entity_player_command)
     reg_entry = mock_client.registrar.get_entity_data(EntityType.PLAYER, test_player)
     assert reg_entry.name == test_player
 
 
-def test_entity_team_message(mock_client):
+def test_entity_team_command(mock_client):
     test_team = "YMCA CC"
-    entity_team_message = {
-        "message_type": "entity",
+    entity_team_command = {
+        "command_type": "entity",
         "body": {"entity_type": "team", "name": test_team},
     }
-    mock_client.handle_message(entity_team_message)
+    mock_client.handle_command(entity_team_command)
     reg_entry = mock_client.registrar.get_entity_data(EntityType.TEAM, test_team)
     assert reg_entry.name == test_team
 
 
-def test_entity_message_errors(mock_client):
+def test_entity_command_errors(mock_client):
     with pytest.raises(ValueError) as exc:
-        mock_client.on_entity_message({"test": "nothing"})
-    assert exc.match("entity message is missing entity type")
+        mock_client.on_entity_command({"test": "nothing"})
+    assert exc.match("entity command is missing entity type")
     with pytest.raises(ValueError) as exc:
-        mock_client.on_entity_message({"entity_type": "nothing"})
-    assert exc.match("entity message payload has an invalid type")
+        mock_client.on_entity_command({"entity_type": "nothing"})
+    assert exc.match("entity command payload has an invalid type")
     with pytest.raises(ValueError) as exc:
-        mock_client.on_entity_message({"entity_type": "player"})
-    assert exc.match("entity message must have at least an entity name")
+        mock_client.on_entity_command({"entity_type": "player"})
+    assert exc.match("entity command must have at least an entity name")
 
 
-def test_event_message(mock_client, mocker):
+def test_event_command(mock_client, mocker):
     handler_patch = mocker.patch.object(MatchEngine, "handle_event")
     event = {"event_type": "match_started", "body": {"noop": "noop"}}
-    mock_client.on_event_message(event)
-    assert handler_patch.called_with(EventType.MATCH_STARTED, {"noop": "noop"})
+    mock_client.on_event_command(event)
+    assert handler_patch.called_with({"noop": "noop"})

@@ -130,3 +130,22 @@ def test_new_batter_innings_explicit(mock_innings: Innings, registrar: EntityReg
     assert mock_innings.non_striker == off_strike_player
     prev_batter_innings = mock_innings.get_batter_innings(prev_on_strike_player)
     assert prev_batter_innings.batting_state == BatterInningsState.DISMISSED
+
+
+def test_new_batter_order_num(mock_innings: Innings, registrar: EntityRegistrar):
+    prev_on_strike_player = mock_innings.striker
+    payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    apply_ball_events(payloads, registrar, mock_innings)
+    bic_payload = {"batter": prev_on_strike_player.name, "reason": "d"}
+    mock_innings.handle_batter_innings_completed(bic_payload)
+    bis_payload = {"batter": "Bobby Gamble"}
+    mock_innings.handle_batter_innings_started(bis_payload)
+    assert mock_innings.on_strike_innings.order_num == 3
+    payloads = [{"score_text": "W", "dismissal": {"type": "b"}}]
+    apply_ball_events(payloads, registrar, mock_innings)
+    bic_payload = {"batter": mock_innings.striker.name, "reason": "d"}
+    mock_innings.handle_batter_innings_completed(bic_payload)
+    bis_payload = {"batter": "Lorcan Tucker"}
+    mock_innings.handle_batter_innings_started(bis_payload)
+    assert mock_innings.on_strike_innings.order_num == 4
+    assert mock_innings.off_strike_innings.order_num == 2

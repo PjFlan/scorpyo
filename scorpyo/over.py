@@ -27,17 +27,36 @@ class Over(Context, Scoreable):
         self.bowler = bowler
         self.state = OverState.IN_PROGRESS
 
+    @property
+    def maiden(self) -> bool:
+        if self._score.valid_deliveries < 6:
+            return False
+        return self._score.runs_against_bowler == 0
+
     def description(self) -> dict:
-        return {}
+        output = {"over_number": self.over_number, "bowler": self.bowler.name}
+        return output
 
     def snapshot(self) -> dict:
-        # return runs, boundaries, wickets
-        return {}
+        output = {
+            "total_runs": self.total_runs,
+            "wides": self._score.wide_runs,
+            "no_balls": self._score.no_ball_runs,
+            "byes": self._score.byes,
+            "leg_byes": self._score.leg_byes,
+            "penalty_runs": self._score.penalty_runs,
+            "wickets": self._score.wickets,
+            "fours": self._score.fours,
+            "sixes": self._score.sixes,
+            "dots": self._score.dots,
+        }
+        return output
 
     def overview(self) -> dict:
         output = {
             "description": self.description(),
             "snapshot": self.snapshot(),
+            "maiden": self.maiden,
         }
         return output
 

@@ -9,15 +9,14 @@ from scorpyo.context import Context
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
 from scorpyo.events import EventType
-from scorpyo.registrar import EntityRegistrar
 
 """
 Ideally in future most entity data will be persisted server side but for
 now the client can read in this info on startup each time and keep in memory
 """
 
-# TODO: implement message acking from the engine - i.e. check that the message
-# processed the message the client sent by monitoring output on the engine stream
+# TODO: implement command acking from the engine - i.e. check that the command
+# processed the command the client sent by monitoring output on the engine stream
 # if anything goes awry, the client can respond appropriately
 
 
@@ -26,7 +25,8 @@ class MatchClient:
         self.engine: MatchEngine = engine
         self.registrar = None
         self._sources: List[InputSource] = []
-        self._pending_events = []
+        self._pending_commands: deque = deque()
+        self.engine_sequence = 0
 
     def read(self):
         """loop through the input sources and trigger them to read new data"""
@@ -36,71 +36,88 @@ class MatchClient:
     def process(self):
         """do something with the new data"""
         for source in self._sources:
-            for message in source.query():
-                self.handle_message(message)
+            for command in source.query():
+                self.handle_command(command)
 
     def assign_engine(self, engine: MatchEngine):
         self.engine = engine
+        self.engine.register_client(self)
 
-    def handle_message(self, message: dict):
-        """interpret a message and send it to the engine, registrar or otherwise"""
-        m_type = message.get("message_type")
-        m_body = message.get("body")
+    def handle_command(self, command: dict):
+        """interpret a command and send it to the engine, registrar or otherwise"""
+        m_type = command.get("command_type")
+        m_body = command.get("body")
         if not m_type or not m_body:
             raise ValueError(
-                f"missing message type or body on incoming command" f" {message}"
+                f"missing command type or body on incoming command" f" {command}"
             )
-        funcs = {"entity": self.on_entity_message, "event": self.on_event_message}
+        funcs = {"entity": self.on_entity_command, "event": self.on_event_command}
         func = funcs.get(m_type)
         if not func:
-            raise ValueError(f"invalid message type {m_type}")
-        func(message["body"])
+            raise ValueError(f"invalid command type {m_type}")
+        func(command["body"])
 
     def register_sources(self, sources: List["InputSource"]):
         """a list of sources, ordered according to which should be consumed first"""
         self._sources = sources
 
-    def on_entity_message(self, message: dict):
+    def on_entity_command(self, command: dict):
         self.registrar = Context.assure_entity_registrar()
-        e_type = message.get("entity_type")
+        e_type = command.get("entity_type")
         if not e_type:
-            raise ValueError(f"entity message is missing entity type {message}")
+            raise ValueError(f"entity command is missing entity type {command}")
         try:
             entity_type = EntityType[e_type.upper()]
         except KeyError:
-            raise ValueError(f"entity message payload has an invalid type {e_type}")
-        name = message.get("name")
+            raise ValueError(f"entity command payload has an invalid type {e_type}")
+        name = command.get("name")
         if not name:
-            raise ValueError(f"entity message must have at least an entity name")
+            raise ValueError(f"entity command must have at least an entity name")
         names = [name] if isinstance(name, str) else name
         if entity_type == EntityType.PLAYER:
             func = self.registrar.create_player
         elif entity_type == EntityType.TEAM:
             func = self.registrar.create_team
+        else:
+            raise ValueError(f"no handler available for command type {e_type}")
         for name_ in names:
             func(name_)
 
-    def on_event_message(self, message: dict):
-        """pass to the engine for processing and confirm the engine acked the message
+    def on_event_command(self, command: dict):
+        """pass to the engine for processing and confirm the engine acked the command
         the client should know the internal protocol accepted by the engine and
-        format messages accordingly. For now I will maintain this protocol distinctly
+        format commands accordingly. For now I will maintain this protocol distinctly
         between engine and client but if it grows, may need to move to a protobuf"""
-        e_type = message.get("event_type")
+        e_type = command.get("event_type")
         if not e_type:
-            raise ValueError(f"no event type passed in event message")
+            raise ValueError(f"no event type passed in event command")
         try:
             # TODO: probably should be passing in the event id rather than raw string
             event_type = EventType[e_type.upper()]
         except KeyError:
-            raise ValueError(f"event message payload has an invalid type {e_type}")
-        event = message.get("body")
+            raise ValueError(f"event command payload has an invalid type {e_type}")
+        event = command.get("body")
         if not event:
-            raise ValueError(f"no data passed in event message")
-        self.engine.on_event(event_type, event)
-        self._pending_events.append(event)
+            raise ValueError(f"no data passed in event command")
+        command["command_id"] = self.engine_sequence
+        command["event_type"] = event_type
+        self.engine_sequence += 1
+        self._pending_commands.append(command)
+        self.engine.on_event(command)
 
-    def on_match_update(self, status: dict):
-        print(status)
+    def on_message(self, message: dict):
+        message_id = message.get("message_id")
+        if message_id is None:
+            raise ValueError(f"received message from engine with know id {message}")
+        if len(self._pending_commands) == 0:
+            raise ValueError(f"received message from engine without pending commands")
+        oldest_command = self._pending_commands.popleft()
+        command_id = oldest_command["command_id"]
+        assert message_id == command_id, (
+            f"message_id does not match command_id of "
+            "oldest pending command {message_id} != {command_id}"
+        )
+        print(json.dumps(message, indent=4))
 
     @contextmanager
     def connect(self):
@@ -112,17 +129,17 @@ class MatchClient:
 
 
 class InputSource(abc.ABC):
-    """Mostly a wrapper around various sources of match messages (files, command line,
+    """Mostly a wrapper around various sources of match commands (files, command line,
     web, database etc.)"""
 
     def __init__(self):
         self.is_connected = False
-        self.message_buffer: deque = deque()
+        self.command_buffer: deque = deque()
 
     def query(self):
         """clear the current cache"""
-        while self.message_buffer:
-            yield self.message_buffer.popleft()
+        while self.command_buffer:
+            yield self.command_buffer.popleft()
 
     @abc.abstractmethod
     def connect(self):
@@ -145,7 +162,7 @@ class InputSource(abc.ABC):
         pass
 
     def has_data(self):
-        return self.message_buffer
+        return self.command_buffer
 
 
 class FileSource(InputSource):
@@ -169,20 +186,20 @@ class FileSource(InputSource):
             self.file_handler.close()
 
     def read(self):
-        self.reader(self.file_handler, self.message_buffer)
+        self.reader(self.file_handler, self.command_buffer)
 
     def is_open(self):
         return not self.file_handler.closed
 
 
-def json_reader(file_handler: IOBase, message_buffer: MutableSequence[str]):
-    messages = json.loads(file_handler.read())
-    for message in messages:
-        message_buffer.append(message)
+def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
+    commands = json.loads(file_handler.read())
+    for command in commands:
+        command_buffer.append(command)
 
 
-def plain_reader(file_handler: IOBase, message_buffer: MutableSequence[str]):
+def plain_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
     # TODO pflanagan: if ever want to use key-value, then need this refactor so this
     # creates a dictionary from the source text
     for line in file_handler:
-        message_buffer.append(line.strip())
+        command_buffer.append(line.strip())

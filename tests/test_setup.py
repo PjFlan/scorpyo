@@ -30,13 +30,17 @@ def test_unique_id(registrar):
 
 def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     test_payload = {
-        "match_type": "T20",
-        "home_team": HOME_TEAM,
-        "away_team": AWAY_TEAM,
+        "command_id": 0,
+        "event_type": EventType.MATCH_STARTED,
+        "body": {
+            "match_type": "T20",
+            "home_team": HOME_TEAM,
+            "away_team": AWAY_TEAM,
+        },
     }
     for player_name in HOME_PLAYERS + AWAY_PLAYERS:
         registrar.create_player(player_name)
-    mock_engine.on_event(EventType.MATCH_STARTED, test_payload)
+    mock_engine.on_event(test_payload)
     home_lineup_payload = {"team": "home", "lineup": HOME_PLAYERS}
     away_lineup_payload = {"team": "away", "lineup": AWAY_PLAYERS}
     mock_engine.current_match.handle_team_lineup(home_lineup_payload)

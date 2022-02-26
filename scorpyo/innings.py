@@ -43,9 +43,11 @@ class Innings(Context, Scoreable):
 
         first_over = Over(0, ise.opening_bowler, self)
         self.overs = [first_over]
-        self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over, self)
-        self.on_strike_innings = batter_innings_one = BatterInnings(batter_one, self)
-        self.off_strike_innings = batter_innings_two = BatterInnings(batter_two, self)
+        self.bowler_innings = BowlerInnings(ise.opening_bowler, first_over, self, 1)
+        self.on_strike_innings = batter_innings_one = BatterInnings(batter_one, self, 1)
+        self.off_strike_innings = batter_innings_two = BatterInnings(
+            batter_two, self, 2
+        )
         self.bowler_inningses = [self.bowler_innings]
         self.batter_inningses = [batter_innings_one, batter_innings_two]
         self.ball_in_match_innings_num = 0
@@ -129,7 +131,7 @@ class Innings(Context, Scoreable):
     def overs_bowled(self):
         overs_completed = (self.ball_in_match_innings_num + 1) // 6
         assert overs_completed <= len(self.overs), "overs and balls out of sync"
-        return f"{overs_completed}.{self.ball_in_over_num}"
+        return f"{util.balls_to_overs(self.ball_in_match_innings_num)}"
 
     @property
     def runs_to_win(self) -> Optional[int]:
@@ -148,9 +150,27 @@ class Innings(Context, Scoreable):
     def description(self) -> dict:
         output = {
             "match_innings_num": self.match_innings_num,
-            "innings_of": self.batting_team,
+            "innings_of": self.batting_team.name,
             "batting_innings_num": self.batting_team_innings_num,
             "target": self.target,
+            "start_time": self.start_time,
+        }
+        return output
+
+    def describe_prev_ball(self) -> dict:
+        if len(self._ball_events) == 0:
+            # TODO pflanagan: should log an error here
+            return None
+        prev_ball: BallCompletedEvent = self._ball_events[-1]
+        prev_score: Score = prev_ball.ball_score
+        output = {
+            "runs": prev_score.total_runs,
+            "wickets": prev_score.wickets,
+            "runs_off_bat": prev_score.runs_off_bat,
+            "extras": prev_score.extra_runs,
+            "on_strike": prev_ball.on_strike_player.name,
+            "off_strike": prev_ball.off_strike_player.name,
+            "bowler": prev_ball.bowler.name,
         }
         return output
 
@@ -160,6 +180,7 @@ class Innings(Context, Scoreable):
             "runs": self.runs_scored,
             "wickets": self.wickets_down,
             "runs_to_win": self.runs_to_win,
+            "last_ball": self.describe_prev_ball(),
         }
         if self.on_strike_innings:
             output["on_strike"] = self.on_strike_innings.snapshot()
@@ -363,7 +384,7 @@ class Innings(Context, Scoreable):
                 "batter {existing.batter} has already batted and cannot "
                 "bat again (current state {existing.batting_state})"
             )
-        new_innings = BatterInnings(bis.batter, self)
+        new_innings = BatterInnings(bis.batter, self, len(self.batter_inningses) + 1)
         self.batter_inningses.append(new_innings)
         if not self.on_strike_innings:
             self.on_strike_innings = new_innings
@@ -428,7 +449,9 @@ class Innings(Context, Scoreable):
         try:
             bowler_innings = find_innings(os.bowler, self.bowler_inningses)
         except ValueError:
-            bowler_innings = BowlerInnings(os.bowler, new_over, self)
+            bowler_innings = BowlerInnings(
+                os.bowler, new_over, self, len(self.bowler_inningses) + 1
+            )
             self.bowler_inningses.append(bowler_innings)
         if bowler_innings.overs_completed == self.match.max_bowler_overs:
             raise ValueError(
@@ -479,11 +502,12 @@ class Innings(Context, Scoreable):
 
 
 class BatterInnings(Context, Scoreable):
-    def __init__(self, player: Player, innings: Innings):
+    def __init__(self, player: Player, innings: Innings, order_num: int):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.innings = innings
         self.player = player
+        self.order_num = order_num
         self.balls = []
         self.dismissal = None
         self.batting_state = BatterInningsState.IN_PROGRESS
@@ -493,10 +517,22 @@ class BatterInnings(Context, Scoreable):
         return self._score.valid_deliveries
 
     def description(self) -> dict:
-        return {}
+        output = {
+            "batter_name": self.player.name,
+            "order_number": self.order_num,
+        }
+        return output
 
     def snapshot(self) -> dict:
-        return {}
+        output = {
+            "name": self.player.name,
+            "balls": self.balls_faced,
+            "runs": self.runs_scored,
+            "fours": self._score.fours,
+            "sixes": self._score.sixes,
+            "dots": self._score.dots,
+        }
+        return output
 
     def overview(self) -> dict:
         output = {
@@ -504,11 +540,20 @@ class BatterInnings(Context, Scoreable):
             "snapshot": self.snapshot(),
             "dismissal": self.dismissal_description(),
         }
-        # needs to return dismissal description where applicable
-        return {}
+        return output
 
-    def dismissal_description(self) -> dict:
-        return {}
+    def dismissal_description(self) -> Optional[dict]:
+        if not self.dismissal:
+            return None
+        fielder_name = ""
+        if self.dismissal.fielder:
+            fielder_name = self.dismissal.fielder.name
+        output = {
+            "how_out": self.dismissal.dismissal_type.name,
+            "fielder": fielder_name,
+            "dismissal_time": self.dismissal.dismissal_time,
+        }
+        return output
 
     def on_dismissal(self, dismissal: Dismissal):
         self.dismissal = dismissal
@@ -525,18 +570,17 @@ class BatterInnings(Context, Scoreable):
 
 
 class BowlerInnings(Context, Scoreable):
-    def __init__(self, player: Player, first_over: Over, innings: Innings):
+    def __init__(
+        self, player: Player, first_over: Over, innings: Innings, order_num: int
+    ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.innings = innings
         self.player = player
+        self.order_num = order_num
         self._overs = [first_over]
         self.wickets = 0
         self.overs_completed = 0
-
-    @property
-    def runs_against(self):
-        return self._score.runs_off_bat + self._score.bowler_extras
 
     @property
     def current_over(self) -> Optional[Over]:
@@ -545,27 +589,37 @@ class BowlerInnings(Context, Scoreable):
         return self._overs[-1]
 
     def description(self) -> dict:
-        return {}
+        return {
+            "bowler_name": self.player.name,
+            "order_num": self.order_num,
+        }
 
     def snapshot(self) -> dict:
-        return {}
+        return {
+            "overs": util.balls_to_overs(self.balls_bowled),
+            "runs_against_bowler": self._score.runs_against_bowler,
+            "wickets": self.wickets,
+            "wides": self._score.wide_runs,
+            "no_balls": self._score.no_ball_runs,
+            "penalty_runs": self._score.penalty_runs,
+            "dots": self._score.dots,
+        }
 
     def overview(self) -> dict:
         output = {
             "description": self.description(),
             "snapshot": self.snapshot(),
         }
-        return {}
+        overs = []
+        for over in self._overs:
+            overs.append(over.overview())
+        output["overs"] = overs
+        return output
 
     def ascii_status(self):
-        balls_in_over = self._score.valid_deliveries % 6
-        overs_completed = self._score.valid_deliveries // 6
-        assert overs_completed >= self.overs_completed, (
-            "bowler overs out of sync " "with balls"
-        )
         resp = (
-            f"{self.player}: {self.runs_against}-{self.wickets} "
-            f"({self.overs_completed}.{balls_in_over})\n"
+            f"{self.player}: {self._score.runs_against_bowler}-{self.wickets} "
+            f"{util.balls_to_overs(self._score.balls_bowled())}\n"
         )
         return resp
 

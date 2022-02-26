@@ -15,6 +15,9 @@ class Score:
         no_ball_runs,
         penalty_runs,
         wickets,
+        fours=0,
+        sixes=0,
+        dots=0,
     ):
         self.runs_off_bat = runs_off_bat
         self.wide_runs = wide_runs
@@ -25,6 +28,9 @@ class Score:
         self.wickets = wickets
         self.valid_deliveries = 0
         self.wide_deliveries = 0
+        self.fours = fours
+        self.sixes = sixes
+        self.dots = dots
 
     @property
     def ran_runs(self):
@@ -55,6 +61,10 @@ class Score:
         new_score.set_calculated_data()
         return new_score
 
+    @property
+    def runs_against_bowler(self):
+        return self.runs_off_bat + self.bowler_extras
+
     def set_calculated_data(self):
         self.valid_deliveries = int(self.is_valid_delivery())
         self.wide_deliveries = 1 if self.wide_runs > 0 else 0
@@ -67,11 +77,11 @@ class Score:
     @classmethod
     def parse(cls, score_text: str):
         if score_text == ".":
-            return Score.from_tuple(0, 0, 0, 0, 0, 0, 0)
+            return Score.from_tuple(0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
         if score_text == "W":
-            return Score.from_tuple(0, 0, 0, 0, 0, 0, 1)
+            return Score.from_tuple(0, 0, 0, 0, 0, 0, 1, 0, 0, 1)
         if score_text == "w":
-            return Score.from_tuple(0, 1, 0, 0, 0, 0, 0)
+            return Score.from_tuple(0, 1, 0, 0, 0, 0, 0, 0, 0, 0)
         groups = cls.SCORE_PATTERN.search(score_text)
         try:
             runs_scored = int(groups.group("num"))
@@ -79,22 +89,31 @@ class Score:
             raise ValueError(f"invalid score text {score_text}")
         modifier = groups.group("mod")
         runs_off_bat = runs_scored
+        fours = sixes = dots = 0
+        if runs_off_bat == 4:
+            fours = 1
+        elif runs_off_bat == 6:
+            sixes = 1
+        elif runs_off_bat == 0:
+            dots = 1
         if modifier:
             if modifier == "W":
-                return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 1)
+                return Score.from_tuple(
+                    runs_off_bat, 0, 0, 0, 0, 0, 1, fours, sixes, runs_off_bat
+                )
             elif modifier == "w":
-                return Score.from_tuple(0, runs_scored, 0, 0, 0, 0, 0)
+                return Score.from_tuple(0, runs_scored, 0, 0, 0, 0, 0, fours, sixes, 0)
             elif modifier == "nb":
                 runs_off_bat -= 1
-                return Score.from_tuple(runs_off_bat, 0, 0, 0, 1, 0, 0)
+                return Score.from_tuple(runs_off_bat, 0, 0, 0, 1, 0, 0, fours, sixes, 0)
             elif modifier == "b":
-                return Score.from_tuple(0, 0, 0, runs_scored, 0, 0, 0)
+                return Score.from_tuple(0, 0, 0, runs_scored, 0, 0, 0, fours, sixes, 1)
             elif modifier == "lb":
-                return Score.from_tuple(0, 0, runs_scored, 0, 0, 0, 0)
+                return Score.from_tuple(0, 0, runs_scored, 0, 0, 0, 0, fours, sixes, 1)
             else:
                 raise ValueError(f"Unknown modifier: {modifier}")
         else:
-            return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 0)
+            return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 0, fours, sixes, dots)
 
     def add(self, new_score):
         self.runs_off_bat += new_score.runs_off_bat
@@ -106,6 +125,8 @@ class Score:
         self.no_ball_runs += new_score.no_ball_runs
         self.penalty_runs += new_score.penalty_runs
         self.wickets += new_score.wickets
+        self.fours += new_score.fours
+        self.sixes += new_score.sixes
         return self
 
 

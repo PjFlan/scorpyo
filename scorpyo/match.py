@@ -225,7 +225,7 @@ class Match(Context, Scoreable):
         team_obj.add_lineup(
             self.entity_registrar.get_from_names(EntityType.PLAYER, payload["lineup"])
         )
-        rlu = RegisterTeamLineup(team_obj.lineup)
+        RegisterTeamLineup(team_obj.lineup)
         message = {
             "team": team_obj.team.name,
             "home_or_away": home_or_away,

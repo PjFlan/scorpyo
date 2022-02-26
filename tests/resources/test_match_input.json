@@ -1,6 +1,6 @@
 [
   {
-    "message_type": "entity",
+    "command_type": "entity",
     "body": {
       "entity_type": "player",
       "name": [
@@ -30,7 +30,7 @@
     }
   },
   {
-    "message_type": "entity",
+    "command_type": "entity",
     "body": {
       "entity_type": "team",
       "name": [
@@ -40,7 +40,7 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "match_started",
       "body": {
@@ -51,7 +51,7 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "register_line_up",
       "body": {
@@ -73,7 +73,7 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "register_line_up",
       "body": {
@@ -95,7 +95,7 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "innings_started",
       "body": {
@@ -105,7 +105,7 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "ball_completed",
       "body": {
@@ -114,11 +114,47 @@
     }
   },
   {
-    "message_type": "event",
+    "command_type": "event",
     "body": {
       "event_type": "ball_completed",
       "body": {
         "score_text": "W"
+      }
+    }
+  },
+  {
+    "command_type": "event",
+    "body": {
+      "event_type": "ball_completed",
+      "body": {
+        "score_text": "4"
+      }
+    }
+  },
+  {
+    "command_type": "event",
+    "body": {
+      "event_type": "ball_completed",
+      "body": {
+        "score_text": "6"
+      }
+    }
+  },
+  {
+    "command_type": "event",
+    "body": {
+      "event_type": "ball_completed",
+      "body": {
+        "score_text": "1"
+      }
+    }
+  },
+  {
+    "command_type": "event",
+    "body": {
+      "event_type": "ball_completed",
+      "body": {
+        "score_text": "2"
       }
     }
   }
