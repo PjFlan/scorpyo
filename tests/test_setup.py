@@ -4,42 +4,37 @@ from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
+from .common import TEST_CONFIG
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 def test_registrar():
-    registrar = EntityRegistrar()
-    test_names = HOME_PLAYERS
-    test_team_home = HOME_TEAM
-    lineup = []
-    for name in test_names:
-        lineup.append(registrar.create_player(name))
-    team_one = registrar.create_team(test_team_home)
-    assert lineup[0] is registrar.get_entity_data(EntityType.PLAYER, test_names[0])
-    assert team_one is registrar.get_entity_data(EntityType.TEAM, test_team_home)
+    registrar = EntityRegistrar(TEST_CONFIG)
+    assert len(registrar.get_all_of_type(EntityType.PLAYER)) > 0
+    assert len(registrar.get_all_of_type(EntityType.TEAM)) > 0
+    player = registrar.get_entity_data(EntityType.PLAYER, HOME_PLAYERS[0])
+    assert player.name == HOME_PLAYERS[0]
 
 
 def test_unique_id(registrar):
-    all_ids = set()
-    num_items = 0
-    for fixed_data in itertools.chain.from_iterable(registrar._store.values()):
-        all_ids.add(fixed_data.unique_id)
-        num_items += 1
-    assert len(all_ids) == num_items
+    for fixed_data in registrar._store.values():
+        all_ids = set()
+        num_items = 0
+        for entity in fixed_data:
+            all_ids.add(entity.unique_id)
+            num_items += 1
+        assert len(all_ids) == num_items
 
 
 def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     test_payload = {
-        "command_id": 0,
-        "event_type": EventType.MATCH_STARTED,
+        "event": EventType.MATCH_STARTED,
         "body": {
             "match_type": "T20",
             "home_team": HOME_TEAM,
             "away_team": AWAY_TEAM,
         },
     }
-    for player_name in HOME_PLAYERS + AWAY_PLAYERS:
-        registrar.create_player(player_name)
     mock_engine.on_event(test_payload)
     home_lineup_payload = {"team": "home", "lineup": HOME_PLAYERS}
     away_lineup_payload = {"team": "away", "lineup": AWAY_PLAYERS}

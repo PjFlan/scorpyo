@@ -1,6 +1,5 @@
 import enum
 
-from scorpyo import event, entity
 from scorpyo.context import Context
 from scorpyo.entity import EntityType, Entity
 from scorpyo.match import Match, MatchState
@@ -44,7 +43,7 @@ class MatchEngine(Context):
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
     def on_event(self, event_command: dict):
-        event_type = event_command.get("event_type")
+        event_type = event_command.get("event")
         if not event_type:
             raise ValueError(
                 f"no event_type specified on incoming command " f"{event_command}"
@@ -52,7 +51,7 @@ class MatchEngine(Context):
         self._events.append(event_command)
         event_message = self.handle_event(event_type, event_command["body"])
         message = {
-            "event_type": event_type.value,
+            "event": event_type.value,
             "message_id": self.message_id,
             "message": event_message,
         }
@@ -109,7 +108,9 @@ class MatchEngine(Context):
         return mce
 
     def on_match_started(self, mse: MatchStartedEvent):
-        self.current_match = Match(mse, self, self.entity_registrar)
+        self.current_match = Match(
+            mse, self, self.entity_registrar, self.event_registrar
+        )
         self._child_context = self.current_match
         return self.current_match.overview()
 

@@ -20,23 +20,22 @@ now the client can read it on startup and keep in memory
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
 
 
-def load_config(config_file: str):
+def load_config(config_file):
     config = configparser.ConfigParser()
     config.read(config_file)
     return config
 
 
 class MatchClient:
-    def __init__(self, config_file=""):
-        self.registrar: EntityRegistrar = EntityRegistrar()
-        self.engine = MatchEngine(self.registrar)
+    def __init__(self, registrar: EntityRegistrar, engine: MatchEngine, config_file=""):
+        self.registrar = registrar
+        self.engine = engine
         self._sources: List[InputSource] = []
         self._pending_commands: deque = deque()
         self.engine_sequence = 0
         if not config_file:
             config_file = DEFAULT_CFG_DIR
         self.config = load_config(config_file)
-        self.load_entities()
 
     def read(self):
         """loop through the input sources and trigger them to read new data"""
@@ -49,38 +48,23 @@ class MatchClient:
             for command in source.query():
                 self.handle_command(command)
 
-    def assign_engine(self, engine: MatchEngine):
-        self.engine = engine
-        self.engine.register_client(self)
-
     def handle_command(self, command: dict):
         """interpret a command and send it to the engine, registrar or otherwise"""
-        m_type = command.get("command_type")
         m_body = command.get("body")
-        if not m_type or not m_body:
-            raise ValueError(
-                f"missing command type or body on incoming command" f" {command}"
-            )
-        funcs = {"entity": self.on_entity_command, "event": self.on_event_command}
-        func = funcs.get(m_type)
-        if not func:
-            raise ValueError(f"invalid command type {m_type}")
-        func(command["body"])
+        if not m_body:
+            raise ValueError(f"missing body on incoming command" f" {command}")
+        self.on_event_command(command)
 
     def register_sources(self, sources: List["InputSource"]):
         """a list of sources, ordered according to which should be consumed first"""
         self._sources = sources
-
-    def load_entities(self):
-        entities_config = self.config["ENTITIES"]
-        self.registrar.load_entities(entities_config)
 
     def on_event_command(self, command: dict):
         """pass to the engine for processing and confirm the engine acked the command
         the client should know the internal protocol accepted by the engine and
         format commands accordingly. For now I will maintain this protocol distinctly
         between engine and client but if it grows, may need to move to a protobuf"""
-        e_type = command.get("event_type")
+        e_type = command.get("event")
         if not e_type:
             raise ValueError(f"no event type passed in event command")
         try:
@@ -92,7 +76,7 @@ class MatchClient:
         if not event:
             raise ValueError(f"no data passed in event command")
         command["command_id"] = self.engine_sequence
-        command["event_type"] = event_type
+        command["event"] = event_type
         self.engine_sequence += 1
         self._pending_commands.append(command)
         self.engine.on_event(command)

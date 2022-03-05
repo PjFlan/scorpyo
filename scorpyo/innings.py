@@ -15,6 +15,7 @@ from scorpyo.event import (
     OverCompletedEvent,
     OverStartedEvent,
     InningsCompletedEvent,
+    record_event,
 )
 from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
@@ -28,11 +29,13 @@ class Innings(Context, Scoreable):
         ise: InningsStartedEvent,
         match: "Match",
         entity_registrar: "EntityRegistrar",
+        event_registrar: "EventRegistrar",
     ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match = match
         self.entity_registrar = entity_registrar
+        self.event_registrar = event_registrar
         self.start_time = ise.start_time
         self.end_time = None
         self.match_innings_num = ise.match_innings_num

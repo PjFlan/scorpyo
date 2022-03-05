@@ -13,7 +13,7 @@ def test_ball_completed(mock_innings: Innings, registrar: EntityRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     mock_innings.handle_ball_completed(payload)
-    event = Context.event_registrar.peek()
+    event = mock_innings.event_registrar.peek()
     assert event.ball_score.runs_off_bat == 1
     assert mock_innings.off_strike_innings.runs_scored == 1
     assert mock_innings.on_strike_innings.runs_scored == 0
@@ -23,7 +23,7 @@ def test_strike_rotates(mock_innings: Innings, registrar: EntityRegistrar):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     mock_innings.handle_ball_completed(payload)
-    event = Context.event_registrar.peek()
+    event = mock_innings.event_registrar.peek()
     assert event.players_crossed
     assert event.ball_score.runs_off_bat == 1
     expected_on_strike = HOME_PLAYERS[1]

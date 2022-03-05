@@ -17,10 +17,12 @@ class FileLoaderVisitor:
         players = []
         with open(file_source, newline="") as fh:
             reader = csv.reader(fh)
+            id_counter = 0
             for row in reader:
                 name = row[0]
-                new_player = Player(name)
+                new_player = Player(id_counter, name)
                 players.append(new_player)
+                id_counter += 1
         return players
 
     def visit_team(self) -> list[Team]:
@@ -28,21 +30,25 @@ class FileLoaderVisitor:
         teams = []
         with open(file_source, newline="") as fh:
             reader = csv.reader(fh)
+            id_counter = 0
             for row in reader:
                 name = row[0]
-                new_team = Team(name)
+                new_team = Team(id_counter, name)
                 teams.append(new_team)
+                id_counter += 1
         return teams
 
 
 class EntityRegistrar:
-    def __init__(self):
+    def __init__(self, entities_config: dict):
+        self.config = entities_config
         self._store = defaultdict(list)
         self._id_counter = 0
+        self.load_entities()
 
-    def load_entities(self, entities_config: dict):
-        loader_klass = {"file": FileLoaderVisitor}
-        loader_visitor = loader_klass(entities_config)
+    def load_entities(self):
+        loader_klass = {"file": FileLoaderVisitor}[self.config["loader"]]
+        loader_visitor = loader_klass(self.config)
         for entity in EntityType:
             func_name = f"visit_{entity.name.lower()}"
             func = getattr(loader_visitor, func_name)
@@ -56,9 +62,9 @@ class EntityRegistrar:
             return None
         search_list = self._store[entity_type]
         lookup = "name" if isinstance(item_reference, str) else "unique_id"
-        for test_item in search_list:
-            if getattr(test_item, lookup) == item_reference:
-                return test_item
+        for candidate in search_list:
+            if getattr(candidate, lookup) == item_reference:
+                return candidate
         raise ValueError(f"No {entity_type} found with reference {item_reference}")
 
     def get_all_of_type(self, entity_type: EntityType):

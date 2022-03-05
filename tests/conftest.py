@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 
 import pytest
@@ -8,9 +9,10 @@ from scorpyo.innings import find_innings, BatterInningsState
 from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.entity import Player
-from scorpyo.registrar import EntityType
+from scorpyo.registrar import EntityType, EntityRegistrar, EventRegistrar
 from scorpyo.static_data import match
 from scorpyo.entity import MatchTeam
+from .common import RESOURCES_PATH, TEST_CONFIG
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -23,7 +25,11 @@ test_team_away = AWAY_TEAM
 
 # noinspection PyMissingConstructor
 class MockMatch(Match):
-    def __init__(self):
+    def __init__(
+        self, entity_registrar: EntityRegistrar, event_registrar: EventRegistrar
+    ):
+        self.entity_registrar = entity_registrar
+        self.event_registrar = event_registrar
         self.match_id = 12345
         self.num_innings_completed = 0
         self.match_inningses = []
@@ -77,31 +83,25 @@ class MockMatch(Match):
 
 @pytest.fixture()
 def registrar():
-    ent_registrar = entity.assure_entity_registrar()
-    ent_registrar.create_team(test_team_home)
-    ent_registrar.create_team(test_team_away)
+    ent_registrar = EntityRegistrar(TEST_CONFIG)
     return ent_registrar
 
 
 @pytest.fixture()
 def mock_engine(registrar):
-    return MatchEngine()
+    return MatchEngine(registrar)
 
 
 @pytest.fixture()
 def mock_match(registrar):
-    mock_match = MockMatch()
+    mock_match = MockMatch(registrar, EventRegistrar())
     teams = registrar.get_all_of_type(EntityType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
     mock_match.home_lineup = MatchTeam(mock_match.match_id, mock_match.home_team)
     mock_match.away_lineup = MatchTeam(mock_match.match_id, mock_match.away_team)
-    lineup_home = []
-    lineup_away = []
-    for name in test_players_home:
-        lineup_home.append(registrar.create_player(name))
-    for name in test_players_away:
-        lineup_away.append(registrar.create_player(name))
+    lineup_home = registrar.get_from_names(EntityType.PLAYER, test_players_home)
+    lineup_away = registrar.get_from_names(EntityType.PLAYER, test_players_away)
     mock_match.home_lineup.add_lineup(lineup_home)
     mock_match.away_lineup.add_lineup(lineup_away)
     return mock_match

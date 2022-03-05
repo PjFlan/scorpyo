@@ -87,8 +87,8 @@ class RegisterTeamLineup(NamedTuple):
 def record_event(func: callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        obj = args[0]
-        obj.event_registrar.add(args[1])  # first arg would be self
+        obj = args[0]  # self
+        obj.event_registrar.add(args[1])
         return func(*args, **kwargs)
 
     return wrapper

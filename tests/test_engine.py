@@ -4,7 +4,7 @@ from tests.resources import HOME_TEAM, AWAY_TEAM
 
 
 def test_match_started(registrar):
-    engine = MatchEngine()
+    engine = MatchEngine(registrar)
     message = {"match_type": "OD", "home_team": HOME_TEAM, "away_team": AWAY_TEAM}
     engine.handle_match_started(message)
     assert engine.current_match.state == MatchState.IN_PROGRESS

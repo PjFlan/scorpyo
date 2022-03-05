@@ -10,8 +10,8 @@ class MatchType(NamedTuple):
 
 
 TWENTY_20 = MatchType(1, 20, 1, 4, "T20")
-ONE_DAY = MatchType(1, 50, 1, 10, "One Day")
-FIRST_CLASS = MatchType(2, None, 4, None, "First Class")
+ONE_DAY = MatchType(1, 50, 1, 10, "ONE DAY")
+FIRST_CLASS = MatchType(2, None, 4, None, "FIRST CLASS")
 
 _match_types = {"T20": TWENTY_20, "OD": ONE_DAY, "FC": FIRST_CLASS}
 

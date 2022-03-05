@@ -2,7 +2,7 @@ import enum
 from typing import Optional, List
 
 import scorpyo.util as util
-from scorpyo.context import Context, record_event
+from scorpyo.context import Context
 from scorpyo.event import (
     BallCompletedEvent,
     BatterInningsCompletedEvent,
@@ -12,6 +12,7 @@ from scorpyo.event import (
     EventType,
     InningsCompletedEvent,
     RegisterTeamLineup,
+    record_event,
 )
 from scorpyo.entity import EntityType
 from scorpyo.innings import Innings, InningsState
@@ -32,11 +33,13 @@ class Match(Context, Scoreable):
         mse: MatchStartedEvent,
         match_engine: "MatchEngine",
         entity_registrar: "EntityRegistrar",
+        event_registrar: "EventRegistrar",
     ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match_engine = match_engine
         self.entity_registrar = entity_registrar
+        self.event_registrar = event_registrar
         self.match_id = mse.match_id
         self.start_time = mse.start_time
         self.state = MatchState.IN_PROGRESS
@@ -241,7 +244,7 @@ class Match(Context, Scoreable):
 
     @record_event
     def on_innings_started(self, ise: InningsStartedEvent):
-        new_innings = Innings(ise, self)
+        new_innings = Innings(ise, self, self.entity_registrar, self.event_registrar)
         new_innings.target = self.next_innings_target
         self.add_innings(new_innings)
         self._child_context = new_innings

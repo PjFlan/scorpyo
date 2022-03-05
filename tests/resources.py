@@ -1,5 +1,5 @@
 HOME_TEAM = "YMCA CC"
-AWAY_TEAM = "Pembroke CC"
+AWAY_TEAM = "PEMBROKE CC"
 
 HOME_PLAYERS = [
     "Padraic Flanagan",
