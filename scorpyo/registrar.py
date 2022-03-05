@@ -9,7 +9,6 @@ from scorpyo.entity import Team
 
 
 class FileLoaderVisitor:
-
     def __init__(self, config: dict):
         self.source_dir = config["file_source"]
 
