@@ -1,9 +1,10 @@
 import enum
 
+from scorpyo import event, entity
 from scorpyo.context import Context
-from scorpyo.entity import EntityType
+from scorpyo.entity import EntityType, Entity
 from scorpyo.match import Match, MatchState
-from scorpyo.events import (
+from scorpyo.event import (
     EventType,
     MatchStartedEvent,
     MatchCompletedEvent,
@@ -26,20 +27,21 @@ class MatchEngine(Context):
     that other applications (client, score reporter) can listen for
     """
 
+    event_registrar = None
     match_id = 0
     message_id = 0
 
-    def __init__(self):
+    def __init__(self, entity_registrar: "EntityRegistar"):
         super().__init__()
         self.current_match = None
         self.state: EngineState = EngineState.LOCKED
         self._events = []
         self._score_listeners = []
+        self.entity_registrar = entity_registrar
+        self.event_registrar = EventRegistrar()
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
-
-        Context.assure_event_registrar()
 
     def on_event(self, event_command: dict):
         event_type = event_command.get("event_type")
@@ -107,7 +109,7 @@ class MatchEngine(Context):
         return mce
 
     def on_match_started(self, mse: MatchStartedEvent):
-        self.current_match = Match(mse, self)
+        self.current_match = Match(mse, self, self.entity_registrar)
         self._child_context = self.current_match
         return self.current_match.overview()
 

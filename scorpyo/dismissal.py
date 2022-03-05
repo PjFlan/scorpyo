@@ -1,9 +1,8 @@
 import functools
 import time
-from datetime import datetime
 
 from scorpyo.entity import EntityType
-from scorpyo.player import Player
+from scorpyo.entity import Player
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.static_data.dismissal import get_dismissal_type, DismissalType
 from scorpyo.util import get_current_time

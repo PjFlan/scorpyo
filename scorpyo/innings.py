@@ -4,9 +4,9 @@ import enum
 from typing import Optional, List
 
 import scorpyo.util as util
-from scorpyo.context import Context, record_event
+from scorpyo.context import Context
 from scorpyo.dismissal import Dismissal, parse_dismissal
-from scorpyo.events import (
+from scorpyo.event import (
     BallCompletedEvent,
     InningsStartedEvent,
     BatterInningsCompletedEvent,
@@ -18,15 +18,21 @@ from scorpyo.events import (
 )
 from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
-from scorpyo.player import Player
+from scorpyo.entity import Player
 from scorpyo.score import Scoreable, Score
 
 
 class Innings(Context, Scoreable):
-    def __init__(self, ise: InningsStartedEvent, match: "Match"):
+    def __init__(
+        self,
+        ise: InningsStartedEvent,
+        match: "Match",
+        entity_registrar: "EntityRegistrar",
+    ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match = match
+        self.entity_registrar = entity_registrar
         self.start_time = ise.start_time
         self.end_time = None
         self.match_innings_num = ise.match_innings_num
@@ -302,28 +308,24 @@ class Innings(Context, Scoreable):
 
     def handle_over_completed(self, payload: dict) -> dict:
         if "bowler" not in payload:
-            raise ValueError("must specify bowler of completed over")
-        bowler = self.entity_registrar.get_entity_data(
-            EntityType.PLAYER, payload["bowler"]
-        )
+            bowler = self.current_bowler
+        else:
+            bowler = self.entity_registrar.get_entity_data(
+                EntityType.PLAYER, payload["bowler"]
+            )
+            if bowler != self.current_bowler:
+                raise ValueError(
+                    "OverCompleted event raised for a bowler {bowler} who is "
+                    "not the bowler of the most recent over"
+                )
         reason = payload.get("reason")
         if not reason:
-            raise ValueError(
-                "must provide over completion reason when raising an "
-                "OverCompleted event"
-            )
-        try:
+            reason = OverState.COMPLETED
+        else:
             reason = OverState(payload["reason"])
-        except KeyError:
-            raise ValueError("invalid over completion reason {reason}")
-        if bowler != self.current_bowler:
-            raise ValueError(
-                "OverCompleted event raised for a bowler {bowler} who is "
-                "not the bowler of the most recent over"
-            )
         over_number = payload["over_num"]
-        oc = OverCompletedEvent(over_number, bowler, reason)
-        return self.on_over_completed(oc)
+        oce = OverCompletedEvent(over_number, bowler, reason)
+        return self.on_over_completed(oce)
 
     def handle_over_started(self, payload: dict) -> dict:
         if "bowler" not in payload:
@@ -444,7 +446,7 @@ class Innings(Context, Scoreable):
                 "Existing over has not yet completed. Send an "
                 "OverCompleted event before sending an OverStarted event"
             )
-        new_over = Over(os.over_number, os.bowler, self)
+        new_over = Over(os.number, os.bowler, self)
         self.overs.append(new_over)
         try:
             bowler_innings = find_innings(os.bowler, self.bowler_inningses)
@@ -596,6 +598,7 @@ class BowlerInnings(Context, Scoreable):
 
     def snapshot(self) -> dict:
         return {
+            "name": self.player.name,
             "overs": util.balls_to_overs(self.balls_bowled),
             "runs_against_bowler": self._score.runs_against_bowler,
             "wickets": self.wickets,
@@ -631,17 +634,17 @@ class BowlerInnings(Context, Scoreable):
         if bce.dismissal and bce.dismissal.bowler_accredited():
             self.wickets += 1
 
-    def on_over_completed(self, oc: OverCompletedEvent):
+    def on_over_completed(self, oce: OverCompletedEvent):
         curr_over = self.current_over
-        if curr_over.balls_bowled < 6 and oc.reason == OverState.COMPLETED:
+        if curr_over.balls_bowled < 6 and oce.reason == OverState.COMPLETED:
             raise ValueError(
                 "over cannot have completed with less than 6 legal "
                 " deliveries bowled unless the innings ended"
             )
         self.overs_completed += 1
 
-    def on_over_started(self, os: OverStartedEvent):
-        over = self.innings.get_over_by_number(os.over_number)
+    def on_over_started(self, ose: OverStartedEvent):
+        over = self.innings.get_over_by_number(ose.number)
         self._overs.append(over)
 
 

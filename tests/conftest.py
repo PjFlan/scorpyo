@@ -2,15 +2,15 @@ from copy import deepcopy
 
 import pytest
 
-from scorpyo.context import Context
+from scorpyo import entity
 from scorpyo.engine import MatchEngine
 from scorpyo.innings import find_innings, BatterInningsState
 from scorpyo.match import Match
 from scorpyo.over import OverState
-from scorpyo.player import Player
-from scorpyo.registrar import EntityRegistrar, EntityType
+from scorpyo.entity import Player
+from scorpyo.registrar import EntityType
 from scorpyo.static_data import match
-from scorpyo.team import MatchTeam
+from scorpyo.entity import MatchTeam
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -51,7 +51,7 @@ class MockMatch(Match):
             next_over.bowler = bowler
             self.current_innings.overs.append(next_over)
             next_over.state = OverState.COMPLETED
-            next_over.over_number = prev_over.over_number + 1
+            next_over.number = prev_over.number + 1
         else:
             payload = {"score_text": "."}
             self.current_innings.current_over.bowler = bowler
@@ -77,7 +77,7 @@ class MockMatch(Match):
 
 @pytest.fixture()
 def registrar():
-    ent_registrar = Context.assure_entity_registrar()
+    ent_registrar = entity.assure_entity_registrar()
     ent_registrar.create_team(test_team_home)
     ent_registrar.create_team(test_team_away)
     return ent_registrar

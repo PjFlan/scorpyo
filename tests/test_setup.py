@@ -1,7 +1,7 @@
 import itertools
 
 from scorpyo.engine import MatchEngine
-from scorpyo.events import EventType
+from scorpyo.event import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
@@ -64,5 +64,5 @@ def test_new_innings(registrar, mock_match):
     assert len(mock_match.match_inningses) == 1
     current_innings = mock_match.current_innings
     assert current_innings.match_innings_num == 0
-    assert current_innings.current_over.over_number == 0
+    assert current_innings.current_over.number == 0
     assert current_innings.batting_team_innings_num == 0

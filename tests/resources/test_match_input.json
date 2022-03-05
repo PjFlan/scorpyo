@@ -1,9 +1,17 @@
 [
   {
-    "command_type": "entity",
+    "event": "ms",
     "body": {
-      "entity_type": "player",
-      "name": [
+        "match_type": "T20",
+        "home_team": "YMCA CC",
+        "away_team": "Pembroke CC"
+    }
+  },
+  {
+    "event": "rlu",
+    "body": {
+      "team": "home",
+      "lineup": [
         "Padraic Flanagan",
         "Jack Tector",
         "Harry Tector",
@@ -14,7 +22,15 @@
         "Glen Maxwell",
         "Dean Elgar",
         "Joe Root",
-        "Kane Williamson",
+        "Kane Williamson"
+      ]
+    }
+  },
+  {
+    "event": "rlu",
+    "body": {
+      "team": "away",
+      "lineup": [
         "JJ Cassidy",
         "Callum Donnelly",
         "Tim Tector",
@@ -30,132 +46,64 @@
     }
   },
   {
-    "command_type": "entity",
+    "event": "is",
     "body": {
-      "entity_type": "team",
-      "name": [
-        "YMCA CC",
-        "Pembroke CC"
-        ]
+      "batting_team": "YMCA CC",
+      "opening_bowler": "Trent Boult"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "match_started",
-      "body": {
-          "match_type": "T20",
-          "home_team": "YMCA CC",
-          "away_team": "Pembroke CC"
-      }
+      "score_text": "1"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "register_line_up",
-      "body": {
-        "team": "home",
-        "lineup": [
-          "Padraic Flanagan",
-          "Jack Tector",
-          "Harry Tector",
-          "Bobby Gamble",
-          "Lorcan Tucker",
-          "Mikey O'Reilly",
-          "Ricky Ponting",
-          "Glen Maxwell",
-          "Dean Elgar",
-          "Joe Root",
-          "Kane Williamson"
-        ]
-      }
+      "score_text": "W"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "register_line_up",
-      "body": {
-        "team": "away",
-        "lineup": [
-          "JJ Cassidy",
-          "Callum Donnelly",
-          "Tim Tector",
-          "Oliver Gunning",
-          "Steve Smith",
-          "Simi Singh",
-          "Sam Streek",
-          "James Anderson",
-          "Ravindra Jadeja",
-          "Mark Wood",
-          "Trent Boult"
-        ]
-      }
+      "score_text": "4"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "innings_started",
-      "body": {
-        "batting_team": "YMCA CC",
-        "opening_bowler": "Trent Boult"
-      }
+      "score_text": "6"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "1"
-      }
+      "score_text": "1"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "W"
-      }
+      "score_text": "2"
     }
   },
   {
-    "command_type": "event",
+    "event": "oc",
     "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "4"
-      }
+      "over_num": 0
     }
   },
   {
-    "command_type": "event",
+    "event": "os",
     "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "6"
-      }
+      "bowler": "Mark Wood"
     }
   },
   {
-    "command_type": "event",
+    "event": "bc",
     "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "1"
-      }
-    }
-  },
-  {
-    "command_type": "event",
-    "body": {
-      "event_type": "ball_completed",
-      "body": {
-        "score_text": "2"
-      }
+      "score_text": "1"
     }
   }
 ]

@@ -8,7 +8,7 @@ import pytest
 from scorpyo.client import MatchClient, FileSource, json_reader, plain_reader
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
-from scorpyo.events import EventType, MatchStartedEvent
+from scorpyo.event import EventType, MatchStartedEvent
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'

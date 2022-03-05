@@ -1,7 +1,7 @@
 import pytest
 
 from scorpyo.context import Context
-from scorpyo.events import InningsCompletedEvent
+from scorpyo.event import InningsCompletedEvent
 from scorpyo.innings import Innings, InningsState, BatterInningsState
 from scorpyo.registrar import EntityRegistrar
 from .conftest import MockMatch

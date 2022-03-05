@@ -3,7 +3,7 @@ from typing import Optional, List
 
 import scorpyo.util as util
 from scorpyo.context import Context, record_event
-from scorpyo.events import (
+from scorpyo.event import (
     BallCompletedEvent,
     BatterInningsCompletedEvent,
     InningsStartedEvent,
@@ -16,7 +16,7 @@ from scorpyo.events import (
 from scorpyo.entity import EntityType
 from scorpyo.innings import Innings, InningsState
 from scorpyo.score import Scoreable
-from scorpyo.team import Team, MatchTeam
+from scorpyo.entity import Team, MatchTeam
 
 
 # TODO pflanagan: I don't like multiple inheritance here
@@ -27,10 +27,16 @@ from scorpyo.team import Team, MatchTeam
 # returns a snapshot, or an overview (which is a full scorecard essentially). Can then
 # also add an api to allow the client to request an overview
 class Match(Context, Scoreable):
-    def __init__(self, mse: MatchStartedEvent, match_engine: "MatchEngine"):
+    def __init__(
+        self,
+        mse: MatchStartedEvent,
+        match_engine: "MatchEngine",
+        entity_registrar: "EntityRegistrar",
+    ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match_engine = match_engine
+        self.entity_registrar = entity_registrar
         self.match_id = mse.match_id
         self.start_time = mse.start_time
         self.state = MatchState.IN_PROGRESS

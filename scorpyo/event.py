@@ -1,11 +1,12 @@
 from enum import Enum
+from functools import wraps
 from typing import NamedTuple
 
 from scorpyo.dismissal import Dismissal
 from scorpyo.static_data.match import MatchType
-from scorpyo.player import Player
+from scorpyo.entity import Player
 from scorpyo.score import Score
-from scorpyo.team import Team, MatchTeam
+from scorpyo.entity import Team, MatchTeam
 
 
 class EventType(Enum):
@@ -76,8 +77,18 @@ class OverCompletedEvent(NamedTuple):
 
 class OverStartedEvent(NamedTuple):
     bowler: Player
-    over_number: int
+    number: int
 
 
 class RegisterTeamLineup(NamedTuple):
     lineup: list[Player]
+
+
+def record_event(func: callable):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        obj = args[0]
+        obj.event_registrar.add(args[1])  # first arg would be self
+        return func(*args, **kwargs)
+
+    return wrapper

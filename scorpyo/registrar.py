@@ -1,15 +1,54 @@
+import csv
+import os
 from collections import defaultdict
 from typing import Optional
 
 from scorpyo.entity import EntityType
-from scorpyo.player import Player
-from scorpyo.team import Team
+from scorpyo.entity import Player
+from scorpyo.entity import Team
+
+
+class FileLoaderVisitor:
+
+    def __init__(self, config: dict):
+        self.source_dir = config["file_source"]
+
+    def visit_player(self) -> list[Player]:
+        file_source = os.path.join(self.source_dir, "player.csv")
+        players = []
+        with open(file_source, newline="") as fh:
+            reader = csv.reader(fh)
+            for row in reader:
+                name = row[0]
+                new_player = Player(name)
+                players.append(new_player)
+        return players
+
+    def visit_team(self) -> list[Team]:
+        file_source = os.path.join(self.source_dir, "team.csv")
+        teams = []
+        with open(file_source, newline="") as fh:
+            reader = csv.reader(fh)
+            for row in reader:
+                name = row[0]
+                new_team = Team(name)
+                teams.append(new_team)
+        return teams
 
 
 class EntityRegistrar:
     def __init__(self):
         self._store = defaultdict(list)
         self._id_counter = 0
+
+    def load_entities(self, entities_config: dict):
+        loader_klass = {"file": FileLoaderVisitor}
+        loader_visitor = loader_klass(entities_config)
+        for entity in EntityType:
+            func_name = f"visit_{entity.name.lower()}"
+            func = getattr(loader_visitor, func_name)
+            entities = func()
+            self._store[entity] = entities
 
     def get_entity_data(
         self, entity_type: EntityType, item_reference: any
@@ -22,18 +61,6 @@ class EntityRegistrar:
             if getattr(test_item, lookup) == item_reference:
                 return test_item
         raise ValueError(f"No {entity_type} found with reference {item_reference}")
-
-    def create_player(self, name: str):
-        new_player = Player(self._id_counter, name)
-        self._store[EntityType.PLAYER].append(new_player)
-        self._id_counter += 1
-        return new_player
-
-    def create_team(self, name: str):
-        new_team = Team(self._id_counter, name)
-        self._store[EntityType.TEAM].append(new_team)
-        self._id_counter += 1
-        return new_team
 
     def get_all_of_type(self, entity_type: EntityType):
         return self._store[entity_type]

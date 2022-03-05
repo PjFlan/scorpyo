@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from scorpyo.events import InningsStartedEvent
+from scorpyo.event import InningsStartedEvent
 from scorpyo.innings import Innings
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.static_data.match import FIRST_CLASS

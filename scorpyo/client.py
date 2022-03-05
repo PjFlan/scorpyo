@@ -5,28 +5,38 @@ from contextlib import contextmanager
 from io import IOBase
 from typing import List, MutableSequence
 
-from scorpyo.context import Context
+import configparser
+
 from scorpyo.engine import MatchEngine
-from scorpyo.entity import EntityType
-from scorpyo.events import EventType
+from scorpyo.event import EventType
+from scorpyo.registrar import EntityRegistrar
 
 """
 Ideally in future most entity data will be persisted server side but for
-now the client can read in this info on startup each time and keep in memory
+now the client can read it on startup and keep in memory
 """
 
-# TODO: implement command acking from the engine - i.e. check that the command
-# processed the command the client sent by monitoring output on the engine stream
-# if anything goes awry, the client can respond appropriately
+
+DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
+
+
+def load_config(config_file: str):
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    return config
 
 
 class MatchClient:
-    def __init__(self, engine: MatchEngine = None):
-        self.engine: MatchEngine = engine
-        self.registrar = None
+    def __init__(self, config_file=""):
+        self.registrar: EntityRegistrar = EntityRegistrar()
+        self.engine = MatchEngine(self.registrar)
         self._sources: List[InputSource] = []
         self._pending_commands: deque = deque()
         self.engine_sequence = 0
+        if not config_file:
+            config_file = DEFAULT_CFG_DIR
+        self.config = load_config(config_file)
+        self.load_entities()
 
     def read(self):
         """loop through the input sources and trigger them to read new data"""
@@ -61,27 +71,9 @@ class MatchClient:
         """a list of sources, ordered according to which should be consumed first"""
         self._sources = sources
 
-    def on_entity_command(self, command: dict):
-        self.registrar = Context.assure_entity_registrar()
-        e_type = command.get("entity_type")
-        if not e_type:
-            raise ValueError(f"entity command is missing entity type {command}")
-        try:
-            entity_type = EntityType[e_type.upper()]
-        except KeyError:
-            raise ValueError(f"entity command payload has an invalid type {e_type}")
-        name = command.get("name")
-        if not name:
-            raise ValueError(f"entity command must have at least an entity name")
-        names = [name] if isinstance(name, str) else name
-        if entity_type == EntityType.PLAYER:
-            func = self.registrar.create_player
-        elif entity_type == EntityType.TEAM:
-            func = self.registrar.create_team
-        else:
-            raise ValueError(f"no handler available for command type {e_type}")
-        for name_ in names:
-            func(name_)
+    def load_entities(self):
+        entities_config = self.config["ENTITIES"]
+        self.registrar.load_entities(entities_config)
 
     def on_event_command(self, command: dict):
         """pass to the engine for processing and confirm the engine acked the command
@@ -190,6 +182,26 @@ class FileSource(InputSource):
 
     def is_open(self):
         return not self.file_handler.closed
+
+
+class CommandLineSource(InputSource):
+    def __init__(self):
+        super().__init__()
+        self.active = True
+
+    def connect(self):
+        self.active = True
+
+    def close(self):
+        self.active = False
+
+    def is_open(self):
+        return self.active
+
+    def read(self):
+        """TODO pflanagan: query the DAG for the event type and exhaust all questions
+        in order to obtain sufficient data to build a command"""
+        pass
 
 
 def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
