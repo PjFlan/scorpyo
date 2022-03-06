@@ -69,7 +69,7 @@ class MatchClient:
             raise ValueError(f"no event type passed in event command")
         try:
             # TODO: probably should be passing in the event id rather than raw string
-            event_type = EventType[e_type.upper()]
+            event_type = EventType(e_type)
         except KeyError:
             raise ValueError(f"event command payload has an invalid type {e_type}")
         event = command.get("body")
@@ -97,6 +97,7 @@ class MatchClient:
 
     @contextmanager
     def connect(self):
+        self.engine.register_client(self)
         for source in self._sources:
             source.connect()
         yield self

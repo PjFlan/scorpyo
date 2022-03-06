@@ -7,7 +7,7 @@ from tests.common import RESOURCES_PATH, TEST_CONFIG, TEST_CONFIG_PATH
 
 
 def main():
-    registrar = EntityRegistrar(TEST_CONFIG["ENTITIES"])
+    registrar = EntityRegistrar(TEST_CONFIG)
     engine = MatchEngine(registrar)
     client = MatchClient(registrar, engine, TEST_CONFIG_PATH)
     test_event_source = os.path.join(RESOURCES_PATH, "test_match_input.json")

@@ -132,6 +132,6 @@ def test_command_missing_body(mock_client):
 
 def test_event_command(mock_client, mocker):
     handler_patch = mocker.patch.object(MatchEngine, "handle_event")
-    event = {"event": "match_started", "body": {"noop": "noop"}}
+    event = {"event": "ms", "body": {"noop": "noop"}}
     mock_client.on_event_command(event)
     assert handler_patch.called_with({"noop": "noop"})

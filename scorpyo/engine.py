@@ -53,7 +53,7 @@ class MatchEngine(Context):
         message = {
             "event": event_type.value,
             "message_id": self.message_id,
-            "message": event_message,
+            "body": event_message,
         }
         self.message_id += 1
         self.send_message(message)

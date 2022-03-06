@@ -63,7 +63,10 @@ class EntityRegistrar:
         search_list = self._store[entity_type]
         lookup = "name" if isinstance(item_reference, str) else "unique_id"
         for candidate in search_list:
-            if getattr(candidate, lookup) == item_reference:
+            entity_id = getattr(candidate, lookup)
+            if lookup == "name":
+                entity_id = entity_id.upper()
+            if entity_id == item_reference.upper():
                 return candidate
         raise ValueError(f"No {entity_type} found with reference {item_reference}")
 

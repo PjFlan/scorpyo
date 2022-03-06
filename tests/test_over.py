@@ -155,7 +155,7 @@ def test_over_started_same_bowler(mock_innings: Innings, registrar: EntityRegist
         "reason": OverState.COMPLETED.value,
     }
     mock_innings.handle_over_completed(oc_payload)
-    os_payload = {"bowler": new_bowler}
+    os_payload = {"bowler": new_bowler.name}
     with pytest.raises(ValueError):
         mock_innings.handle_over_started(os_payload)
 
