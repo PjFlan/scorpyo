@@ -1,5 +1,24 @@
 import time
 
+import configparser
+
+
+def load_config(config_file):
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    return config
+
+
+def try_int_convert(input):
+    try:
+        return int(input)
+    except ValueError:
+        return input
+
+
+def identity(input):
+    return input
+
 
 def switch_strike(striker, non_striker):
     temp = non_striker

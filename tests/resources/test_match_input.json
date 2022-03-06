@@ -4,7 +4,7 @@
     "body": {
         "match_type": "T20",
         "home_team": "YMCA CC",
-        "away_team": "Pembroke CC"
+        "away_team": "PEMBROKE CC"
     }
   },
   {
@@ -61,7 +61,22 @@
   {
     "event": "bc",
     "body": {
-      "score_text": "W"
+      "score_text": "W",
+      "dismissal": {
+        "type": "b"
+      }
+    }
+  },
+  {
+    "event": "bic",
+    "body": {
+      "batter": "Jack Tector"
+    }
+  },
+  {
+    "event": "bis",
+    "body": {
+      "batter": "Harry Tector"
     }
   },
   {

@@ -45,25 +45,22 @@ def mock_file():
 @pytest.fixture
 def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar):
     my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
-    file_source = FileSource("path/to/resource", plain_reader)
-    my_client.register_sources([file_source])
     return my_client
 
 
-def test_client_setup(mock_engine: MatchEngine, mock_file, monkeypatch, registrar):
+def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatch):
     my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    file_source = FileSource("", plain_reader)
-    my_client.register_sources([file_source])
     with my_client.connect() as client:
         assert len(client._sources) == 1
         assert client._sources[0].is_open()
     assert not my_client._sources[0].is_open()
 
 
-def test_file_source_plain_reader(monkeypatch, mock_file):
+def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    file_source = FileSource("", plain_reader)
+    config = {"FILE_SOURCE": {"url": "/path/to/url", "reader": "plain"}}
+    file_source = FileSource(config, registrar)
     file_source.connect()
     mock_file.write_lines(LINES[0:2])
     file_source.read()
@@ -78,9 +75,10 @@ def test_file_source_plain_reader(monkeypatch, mock_file):
     file_source.close()
 
 
-def test_file_source_json_reader(monkeypatch, mock_file):
+def test_file_source_json_reader(registrar, mock_file, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    file_source = FileSource("", json_reader)
+    config = {"FILE_SOURCE": {"url": "/path/to/url", "reader": "json"}}
+    file_source = FileSource(config, registrar)
     file_source.connect()
     mock_file.write(TEST_JSON)
     file_source.read()
@@ -92,7 +90,12 @@ def test_file_source_json_reader(monkeypatch, mock_file):
     file_source.close()
 
 
-def test_client_plain_reader(mock_client, mock_file, mocker, monkeypatch):
+def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
+    config = {
+        "CLIENT": {"source": "file"},
+        "FILE_SOURCE": {"url": "/path/to/url", "reader": "plain"},
+    }
+    mock_client = MatchClient(registrar, mock_engine, config)
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_file.write_lines(LINES)
     patched = mocker.patch.object(MatchClient, "handle_command")
@@ -104,8 +107,13 @@ def test_client_plain_reader(mock_client, mock_file, mocker, monkeypatch):
     assert not mock_client._sources[0].has_data()
 
 
-def test_client_json_reader(mock_client, mock_file, mocker, monkeypatch):
+def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
+    config = {
+        "CLIENT": {"source": "file"},
+        "FILE_SOURCE": {"url": "/path/to/url", "reader": "json"},
+    }
+    mock_client = MatchClient(registrar, mock_engine, config)
     mock_client._sources[0].reader = json_reader
     mock_file.write(TEST_JSON)
     patched = mocker.patch.object(MatchClient, "handle_command")

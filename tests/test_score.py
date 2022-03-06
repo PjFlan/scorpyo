@@ -3,6 +3,11 @@ import pytest
 from scorpyo.static_data import score
 
 
+# TODO pflanagan: more extensive testing needed here. For example, test that the sum
+#  of a batters boundaries and other runs equals total. Also what to do for a e.g. a
+#  wide that goes for 4 to make sure that does not go down as a boundary for batter
+
+
 def scores_equal(score_one, score_two):
     if score_one.runs_off_bat != score_two.runs_off_bat:
         return False

@@ -40,6 +40,7 @@ class Innings(Context, Scoreable):
         self.end_time = None
         self.match_innings_num = ise.match_innings_num
         self.batting_team_innings_num = ise.batting_team_innings_num
+        self._dismissal_pending = False
 
         self.target = None
         self.state = InningsState.IN_PROGRESS
@@ -288,24 +289,27 @@ class Innings(Context, Scoreable):
         return self.on_ball_completed(bce)
 
     def handle_batter_innings_started(self, payload: dict) -> dict:
-        batter = self.entity_registrar.get_entity_data(
-            EntityType.PLAYER, payload["batter"]
-        )
+        batter = payload.get("batter")
         if not batter:
             try:
-                batter = self.next_batter
+                player = self.next_batter
             except IndexError:
                 raise ValueError(
                     "cannot process new batter innings as there are no players left"
                 )
-        bis = BatterInningsStartedEvent(batter)
+        else:
+            player = self.entity_registrar.get_entity_data(
+                EntityType.PLAYER, payload.get("batter")
+            )
+        bis = BatterInningsStartedEvent(player)
         return self.on_batter_innings_started(bis)
 
     def handle_batter_innings_completed(self, payload: dict) -> dict:
         batter = self.entity_registrar.get_entity_data(
-            EntityType.PLAYER, payload["batter"]
+            EntityType.PLAYER, payload.get("batter")
         )
-        state = BatterInningsState(payload["reason"])
+        reason = payload.get("reason", "d")
+        state = BatterInningsState(reason)
         bic = BatterInningsCompletedEvent(batter, state)
         return self.on_batter_innings_completed(bic)
 
@@ -352,6 +356,11 @@ class Innings(Context, Scoreable):
     @record_event
     def on_ball_completed(self, bce: BallCompletedEvent) -> dict:
         super().update_score(bce)
+        if self._dismissal_pending:
+            raise ValueError(
+                "received BallCompletedEvent before "
+                "BatterInningsCompleted event while dismissal is pending"
+            )
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
         self.ball_in_match_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
@@ -362,6 +371,7 @@ class Innings(Context, Scoreable):
                 self.batter_inningses,
             )
             dismissed_innings.on_dismissal(bce.dismissal)
+            self._dismissal_pending = True
         self.bowler_innings.on_ball_completed(bce)
         self.current_over.on_ball_completed(bce)
         if bce.players_crossed:
@@ -429,6 +439,7 @@ class Innings(Context, Scoreable):
             self.on_strike_innings = None
         else:
             self.off_strike_innings = None
+        self._dismissal_pending = False
         return dismissed_innings.overview()
 
     @record_event

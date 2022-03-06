@@ -76,6 +76,10 @@ class Score:
 
     @classmethod
     def parse(cls, score_text: str):
+        """
+        (runs_off_bat, runs_scored, leg_byes, byes, no_balls,
+        penalty_runs, wickets, fours, sixes, dots)
+        """
         if score_text == ".":
             return Score.from_tuple(0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
         if score_text == "W":
@@ -98,9 +102,7 @@ class Score:
             dots = 1
         if modifier:
             if modifier == "W":
-                return Score.from_tuple(
-                    runs_off_bat, 0, 0, 0, 0, 0, 1, fours, sixes, runs_off_bat
-                )
+                return Score.from_tuple(runs_off_bat, 0, 0, 0, 0, 0, 1, 0, 0, dots)
             elif modifier == "w":
                 return Score.from_tuple(0, runs_scored, 0, 0, 0, 0, 0, fours, sixes, 0)
             elif modifier == "nb":
