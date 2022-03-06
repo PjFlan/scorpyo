@@ -9,15 +9,15 @@ def load_config(config_file):
     return config
 
 
-def try_int_convert(input):
+def try_int_convert(value):
     try:
-        return int(input)
+        return int(value)
     except ValueError:
-        return input
+        return value
 
 
-def identity(input):
-    return input
+def identity(value):
+    return value
 
 
 def switch_strike(striker, non_striker):

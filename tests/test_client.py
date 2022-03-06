@@ -5,9 +5,8 @@ from typing import List
 
 import pytest
 
-from scorpyo.client import MatchClient, FileSource, json_reader, plain_reader
+from scorpyo.client import MatchClient, FileSource, json_reader
 from scorpyo.engine import MatchEngine
-from scorpyo.entity import EntityType
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG_PATH
 
