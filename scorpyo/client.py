@@ -28,24 +28,20 @@ class MatchClient:
     ):
         self.registrar = registrar
         self.engine = engine
-        self._sources: List[InputSource] = []
         self._pending_commands: deque = deque()
         self.engine_sequence = 0
         if isinstance(config, str):
             self.config = load_config(config)
         elif isinstance(config, dict):
             self.config = config
-        self.register_sources()
-
-    def read(self):
-        """loop through the input sources and trigger them to read new data"""
-        for source in self._sources:
-            source.read()
+        self._source: InputSource = None
+        self.register_source()
 
     def process(self):
         """do something with the new data"""
-        for source in self._sources:
-            for command in source.query():
+        while self._source.is_open:
+            self._source.read()
+            for command in self._source.query():
                 self.handle_command(command)
 
     def handle_command(self, command: dict):
@@ -54,14 +50,13 @@ class MatchClient:
             raise ValueError(f"missing body on incoming command" f" {command}")
         self.on_event_command(command)
 
-    def register_sources(self):
+    def register_source(self):
         """a list of sources, ordered according to which should be consumed first"""
         source_name = self.config["CLIENT"]["source"]
         source_klass = {"file": FileSource, "command_line": CommandLineSource}[
             source_name
         ]
-        source = source_klass(self.config, self.registrar)
-        self._sources.append(source)
+        self._source = source_klass(self.config, self.registrar)
 
     def on_event_command(self, command: dict):
         """pass to the engine for processing and confirm the engine acked the command
@@ -102,11 +97,9 @@ class MatchClient:
     @contextmanager
     def connect(self):
         self.engine.register_client(self)
-        for source in self._sources:
-            source.connect()
+        self._source.connect()
         yield self
-        for source in self._sources:
-            source.close()
+        self._source.close()
 
 
 class InputSource(abc.ABC):
@@ -134,15 +127,12 @@ class InputSource(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def is_open(self):
-        pass
-
-    @abc.abstractmethod
     def read(self):
         """read from the source until the internal buffer is full and cache data that
         has yet to be processed upstream"""
         pass
 
+    @property
     def has_data(self):
         return self.command_buffer
 
@@ -152,10 +142,14 @@ class FileSource(InputSource):
         super().__init__(registrar)
         self.config = config["FILE_SOURCE"]
         self.url: str = self.config["url"]
-        self.reader = {"json": json_reader, "plain": plain_reader}[
+        self.reader_func = {"json": json_reader, "plain": plain_reader}[
             self.config["reader"]
         ]
         self.file_handler = None
+
+    @property
+    def is_open(self):
+        return not self.file_handler.closed
 
     def connect(self):
         try:
@@ -164,14 +158,12 @@ class FileSource(InputSource):
             raise ConnectionError(f"error connecting to file source {self.url}")
 
     def close(self):
-        if self.is_open():
+        if self.is_open:
             self.file_handler.close()
 
     def read(self):
-        self.reader(self.file_handler, self.command_buffer)
-
-    def is_open(self):
-        return not self.file_handler.closed
+        self.reader_func(self.file_handler, self.command_buffer)
+        self.close()
 
 
 @dataclass
@@ -179,8 +171,10 @@ class CommandLineNode:
     question: str
     key: str
     next_node: "CommandLineNode" = None
+    is_list = False
     post_process: callable = identity
     trigger_key: int = 0
+    discrete = []
 
 
 ms_node_3 = CommandLineNode("Away Team: ", "away_team", post_process=try_int_convert)
@@ -189,7 +183,19 @@ ms_node_2 = CommandLineNode(
 )
 ms_node_1 = CommandLineNode("Match type: ", "match_type", ms_node_2)
 
-_NODES = {EventType.MATCH_STARTED: [ms_node_1, ms_node_2, ms_node_3]}
+rlu_node_2 = CommandLineNode("Enter player names or IDs. Press 'F' key to finish.\n",
+                             "lineup", post_process=try_int_convert)
+rlu_node_1 = CommandLineNode("Home (h) or away (a) team?", "team", rlu_node_2)
+
+_NODES = {EventType.MATCH_STARTED: [ms_node_1, ms_node_2, ms_node_3],
+          EventType.REGISTER_LINE_UP: [rlu_node_1, rlu_node_2]}
+
+
+def handle_node_value(node, value):
+    if node.discrete and value not in node.discrete:
+        print(f"value must be one of {node.discrete}")
+        return None
+    return node.post_process(value)
 
 
 class CommandLineSource(InputSource):
@@ -197,53 +203,64 @@ class CommandLineSource(InputSource):
         super().__init__(registrar)
         self.active = True
 
+    @property
+    def is_open(self):
+        return self.active
+
     def connect(self):
         self.active = True
 
     def close(self):
         self.active = False
 
-    def is_open(self):
-        return self.active
-
     def read(self):
         """TODO pflanagan: query the DAG for the event type and exhaust all questions
         in order to obtain sufficient data to build a command"""
-        while True:
-            next_command = input("\n > ")
-            if next_command == "help":
-                print(
-                    "Enter an event command using one of the following shortcodes ("
-                    "or type 'quit' to exit the client):"
-                )
-                for event in EventType:
-                    print(f"{event.value} = {event.name}")
+        next_command = input("\n > ")
+        if next_command == "help":
+            print(
+                "Enter an event command using one of the following shortcodes ("
+                "or type 'quit' to exit the client):"
+            )
+            for event in EventType:
+                print(f"{event.value} = {event.name}")
+                return
+        elif next_command == "quit":
+            self.close()
+            return
+        elif next_command == "players":
+            for player in self.registrar.get_all_of_type(EntityType.PLAYER):
+                print(f"{player.unique_id} - {player.name}")
+            return
+        elif next_command == "teams":
+            for team in self.registrar.get_all_of_type(EntityType.TEAM):
+                print(f"{team.unique_id} - {team.name}")
+            return
+        else:
+            try:
+                event_type = EventType(next_command)
+            except AttributeError:
+                print("Not a valid command. Type 'help' for usage instructions.")
+                return
+        nodes = _NODES[event_type]
+        node = nodes[0]
+        body = {}
+        while node:
+            key = node.key
+            value = handle_node_value(input(node.question))
+            if not value:
                 continue
-            elif next_command == "quit":
-                break
-            elif next_command == "players":
-                for player in self.registrar.get_all_of_type(EntityType.PLAYER):
-                    print(f"{player.unique_id} - {player.name}")
-                continue
-            elif next_command == "teams":
-                for team in self.registrar.get_all_of_type(EntityType.TEAM):
-                    print(f"{team.unique_id} - {team.name}")
-                continue
+            if node.is_list:
+                value_list = []
+                while value != "F":
+                    value_list.append(value)
+                    value = handle_node_value(input(node.question))
+                body[key] = value_list
             else:
-                try:
-                    event_type = EventType(next_command)
-                except AttributeError:
-                    print("Not a valid command. Type 'help' for usage instructions.")
-                    continue
-            nodes = _NODES[event_type]
-            node = nodes[0]
-            body = {}
-            while node:
-                key = node.key
-                value = node.post_process(input(node.question))
                 body[key] = value
-                node = node.next_node
-            print(body)
+            node = node.next_node
+        command = {"event": event_type.value, "body": body}
+        self.command_buffer.append(command)
 
 
 def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):

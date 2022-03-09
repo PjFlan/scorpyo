@@ -9,7 +9,6 @@ def main():
     engine = MatchEngine(registrar)
     client = MatchClient(registrar, engine, TEST_CONFIG_PATH)
     with client.connect() as client_:
-        client_.read()
         client_.process()
 
 

@@ -51,9 +51,9 @@ def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatc
     my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     with my_client.connect() as client:
-        assert len(client._sources) == 1
-        assert client._sources[0].is_open()
-    assert not my_client._sources[0].is_open()
+        assert client._source is not None
+        assert client._source.is_open
+    assert not my_client._source.is_open
 
 
 def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
@@ -64,14 +64,6 @@ def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
     mock_file.write_lines(LINES[0:2])
     file_source.read()
     assert len(file_source.command_buffer) == 2
-    mock_file.write(LINES[2])
-    file_source.read()
-    assert len(file_source.command_buffer) == 3
-    read_lines = []
-    for line in file_source.query():
-        read_lines.append(line)
-    assert read_lines == LINES
-    file_source.close()
 
 
 def test_file_source_json_reader(registrar, mock_file, monkeypatch):
@@ -99,11 +91,9 @@ def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypa
     mock_file.write_lines(LINES)
     patched = mocker.patch.object(MatchClient, "handle_command")
     with mock_client.connect() as client:
-        client.read()
-    assert mock_client._sources[0].has_data()
-    mock_client.process()
+        client.process()
     assert patched.call_count == 3
-    assert not mock_client._sources[0].has_data()
+    assert not mock_client._source.has_data
 
 
 def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
@@ -113,15 +103,13 @@ def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypat
         "FILE_SOURCE": {"url": "/path/to/url", "reader": "json"},
     }
     mock_client = MatchClient(registrar, mock_engine, config)
-    mock_client._sources[0].reader = json_reader
+    mock_client._source.reader = json_reader
     mock_file.write(TEST_JSON)
     patched = mocker.patch.object(MatchClient, "handle_command")
     with mock_client.connect() as client:
-        client.read()
-    assert mock_client._sources[0].has_data()
-    mock_client.process()
+        client.process()
     assert patched.call_count == 3
-    assert not mock_client._sources[0].has_data()
+    assert not mock_client._source.has_data
 
 
 def test_event_command_handler(mock_client, mocker):
