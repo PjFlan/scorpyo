@@ -5,10 +5,12 @@ from typing import List
 
 import pytest
 
-from scorpyo.client import MatchClient, FileSource, json_reader
+from scorpyo.client import MatchClient, FileSource, json_reader, CommandLineSource
 from scorpyo.engine import MatchEngine
+from scorpyo.entity import EntityType
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG_PATH
+from tests.resources import HOME_PLAYERS
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
@@ -130,3 +132,47 @@ def test_event_command(mock_client, mocker):
     event = {"event": "ms", "body": {"noop": "noop"}}
     mock_client.on_event_command(event)
     assert handler_patch.called_with({"noop": "noop"})
+
+
+@pytest.mark.parametrize(
+    "method,test_input",
+    [
+        ("show_help", "help"),
+        ("close", "quit"),
+        ("show_entities", "team"),
+        ("show_entities", "player"),
+    ],
+)
+def test_command_line_source(registrar, mocker, method, test_input):
+    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
+    patcher = mocker.patch.object(CommandLineSource, method)
+    mock_input = mocker.Mock()
+    mock_input.side_effect = [test_input]
+    mocker.patch("builtins.input", mock_input)
+    source.read()
+    assert patcher.called
+
+
+def test_command_line_source_ms(registrar, mocker):
+    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
+    mock_input = mocker.Mock()
+    mock_input.side_effect = ["ms", "T20", "YMCA CC", "PEMBROKE CC"]
+    mocker.patch("builtins.input", mock_input)
+    source.read()
+    assert len(source.command_buffer) == 1
+    command = source.command_buffer[0]
+    assert command["body"]["match_type"] == "T20"
+    assert command["body"]["home_team"] == "YMCA CC"
+
+
+def test_command_line_source_rlu(registrar, mocker):
+    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
+    mock_input = mocker.Mock()
+    inputs = ["rlu", "h"] + HOME_PLAYERS + ["F"]
+    mock_input.side_effect = inputs
+    mocker.patch("builtins.input", mock_input)
+    source.read()
+    assert len(source.command_buffer) == 1
+    command = source.command_buffer[0]
+    assert command["body"]["team"] == "home"
+    assert command["body"]["lineup"] == HOME_PLAYERS

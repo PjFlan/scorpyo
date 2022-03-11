@@ -4,9 +4,9 @@ from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import IOBase
-from typing import List, MutableSequence
+from typing import MutableSequence
 
-
+from scorpyo import static_data
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
 from scorpyo.event import EventType
@@ -111,6 +111,10 @@ class InputSource(abc.ABC):
         self.is_connected = False
         self.command_buffer: deque = deque()
 
+    @property
+    def is_open(self):
+        return False
+
     def query(self):
         """clear the current cache"""
         while self.command_buffer:
@@ -171,24 +175,44 @@ class CommandLineNode:
     question: str
     key: str
     next_node: "CommandLineNode" = None
-    is_list = False
+    is_list: bool = False
     post_process: callable = identity
     trigger_key: int = 0
-    discrete = []
+    discrete: frozenset = frozenset()
 
 
+match_type_options = ", ".join(
+    [f"{mt.shortcode}={mt.name}" for mt in static_data.match.get_all_types()]
+)
 ms_node_3 = CommandLineNode("Away Team: ", "away_team", post_process=try_int_convert)
 ms_node_2 = CommandLineNode(
     "Home Team: ", "home_team", ms_node_3, post_process=try_int_convert
 )
-ms_node_1 = CommandLineNode("Match type: ", "match_type", ms_node_2)
+ms_node_1 = CommandLineNode(
+    f"Match type ({match_type_options}: ",
+    "match_type",
+    ms_node_2,
+    discrete=frozenset(static_data.match.get_all_shortcodes()),
+)
 
-rlu_node_2 = CommandLineNode("Enter player names or IDs. Press 'F' key to finish.\n",
-                             "lineup", post_process=try_int_convert)
-rlu_node_1 = CommandLineNode("Home (h) or away (a) team?", "team", rlu_node_2)
+rlu_node_2 = CommandLineNode(
+    "Enter player names or IDs. Press 'F' key to finish.\n",
+    "lineup",
+    is_list=True,
+    post_process=try_int_convert,
+)
+rlu_node_1 = CommandLineNode(
+    "Home (h) or away (a) lineup? ",
+    "team",
+    post_process=lambda x: {"h": "home", "a": "away"}[x],
+    next_node=rlu_node_2,
+    discrete={"h", "a"},
+)
 
-_NODES = {EventType.MATCH_STARTED: [ms_node_1, ms_node_2, ms_node_3],
-          EventType.REGISTER_LINE_UP: [rlu_node_1, rlu_node_2]}
+_NODES = {
+    EventType.MATCH_STARTED: [ms_node_1, ms_node_2, ms_node_3],
+    EventType.REGISTER_LINE_UP: [rlu_node_1, rlu_node_2],
+}
 
 
 def handle_node_value(node, value):
@@ -201,6 +225,7 @@ def handle_node_value(node, value):
 class CommandLineSource(InputSource):
     def __init__(self, config, registrar: EntityRegistrar):
         super().__init__(registrar)
+        self.config = config["COMMAND_LINE_SOURCE"]
         self.active = True
 
     @property
@@ -209,32 +234,28 @@ class CommandLineSource(InputSource):
 
     def connect(self):
         self.active = True
+        self.on_connected()
+
+    def on_connected(self):
+        print(
+            "\nWelcome to the scorpyo CLI. Type 'help' for a list of valid "
+            "instructions, or 'quit' to exit."
+        )
 
     def close(self):
         self.active = False
 
     def read(self):
-        """TODO pflanagan: query the DAG for the event type and exhaust all questions
-        in order to obtain sufficient data to build a command"""
-        next_command = input("\n > ")
+        next_command = input("\n> ")
         if next_command == "help":
-            print(
-                "Enter an event command using one of the following shortcodes ("
-                "or type 'quit' to exit the client):"
-            )
-            for event in EventType:
-                print(f"{event.value} = {event.name}")
-                return
+            self.show_help()
+            return
         elif next_command == "quit":
             self.close()
             return
-        elif next_command == "players":
-            for player in self.registrar.get_all_of_type(EntityType.PLAYER):
-                print(f"{player.unique_id} - {player.name}")
-            return
-        elif next_command == "teams":
-            for team in self.registrar.get_all_of_type(EntityType.TEAM):
-                print(f"{team.unique_id} - {team.name}")
+        elif next_command in {"player", "team"}:
+            entity_type = EntityType[next_command.upper()]
+            self.show_entities(entity_type)
             return
         else:
             try:
@@ -247,20 +268,33 @@ class CommandLineSource(InputSource):
         body = {}
         while node:
             key = node.key
-            value = handle_node_value(input(node.question))
-            if not value:
+            value = handle_node_value(node, input(node.question))
+            if value is None:
                 continue
             if node.is_list:
                 value_list = []
                 while value != "F":
                     value_list.append(value)
-                    value = handle_node_value(input(node.question))
+                    value = handle_node_value(node, input("> "))
                 body[key] = value_list
             else:
                 body[key] = value
             node = node.next_node
         command = {"event": event_type.value, "body": body}
         self.command_buffer.append(command)
+
+    def show_help(self):
+        print(
+            "Enter an event command using one of the following shortcodes ("
+            "or type 'quit' to exit the client). To get all entities of a certain type "
+            "and their unique ID, enter the entity type e.g. 'player' or 'team'."
+        )
+        for event in EventType:
+            print(f"{event.value} = {event.name}")
+
+    def show_entities(self, entity_type: EntityType):
+        for ent in self.registrar.get_all_of_type(entity_type):
+            print(f"{ent.unique_id} - {ent.name}")
 
 
 def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
@@ -270,7 +304,5 @@ def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
 
 
 def plain_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
-    # TODO pflanagan: if ever want to use key-value, then need this refactor so this
-    # creates a dictionary from the source text
     for line in file_handler:
         command_buffer.append(line.strip())

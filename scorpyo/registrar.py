@@ -58,15 +58,16 @@ class EntityRegistrar:
     def get_entity_data(
         self, entity_type: EntityType, item_reference: any
     ) -> Optional[Player]:
-        if not item_reference:
+        if item_reference is None:
             return None
         search_list = self._store[entity_type]
         lookup = "name" if isinstance(item_reference, str) else "unique_id"
         for candidate in search_list:
-            entity_id = getattr(candidate, lookup)
+            entity = getattr(candidate, lookup)
             if lookup == "name":
-                entity_id = entity_id.upper()
-            if entity_id == item_reference.upper():
+                entity = entity.upper()
+                item_reference = item_reference.upper()
+            if entity == item_reference:
                 return candidate
         raise ValueError(f"No {entity_type} found with reference {item_reference}")
 

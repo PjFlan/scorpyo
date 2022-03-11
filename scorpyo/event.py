@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from typing import NamedTuple
@@ -22,7 +23,8 @@ class EventType(Enum):
     REGISTER_LINE_UP = "rlu"
 
 
-class MatchStartedEvent(NamedTuple):
+@dataclass
+class MatchStartedEvent:
     match_id: int
     match_type: MatchType
     start_time: float
@@ -30,13 +32,15 @@ class MatchStartedEvent(NamedTuple):
     away_team: Team
 
 
-class MatchCompletedEvent(NamedTuple):
+@dataclass
+class MatchCompletedEvent:
     match_id: int
     end_time: float
     reason: "MatchState"
 
 
-class InningsStartedEvent(NamedTuple):
+@dataclass
+class InningsStartedEvent:
     match_innings_num: int
     batting_team_innings_num: int
     start_time: float
@@ -45,13 +49,15 @@ class InningsStartedEvent(NamedTuple):
     opening_bowler: Player
 
 
-class InningsCompletedEvent(NamedTuple):
+@dataclass
+class InningsCompletedEvent:
     match_innings_num: int
     end_time: float
     reason: "InningsState"
 
 
-class BallCompletedEvent(NamedTuple):
+@dataclass
+class BallCompletedEvent:
     on_strike_player: Player
     off_strike_player: Player
     bowler: Player
@@ -60,27 +66,32 @@ class BallCompletedEvent(NamedTuple):
     dismissal: Dismissal
 
 
-class BatterInningsCompletedEvent(NamedTuple):
+@dataclass
+class BatterInningsCompletedEvent:
     batter: Player
     batting_state: "BatterInningsState"
 
 
-class BatterInningsStartedEvent(NamedTuple):
+@dataclass
+class BatterInningsStartedEvent:
     batter: Player
 
 
-class OverCompletedEvent(NamedTuple):
+@dataclass
+class OverCompletedEvent:
     number: int
     bowler: Player
     reason: "OverState"
 
 
-class OverStartedEvent(NamedTuple):
+@dataclass
+class OverStartedEvent:
     bowler: Player
     number: int
 
 
-class RegisterTeamLineup(NamedTuple):
+@dataclass
+class RegisterTeamLineup:
     lineup: list[Player]
 
 
