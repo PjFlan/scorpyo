@@ -246,28 +246,14 @@ class Innings(Context, Scoreable):
 
     def handle_ball_completed(self, payload: dict) -> dict:
         ball_score = Score.parse(payload["score_text"])
-        dismissal_payload = dismissal = None
+        dismissal = None
         on_strike_player = self.striker
         off_strike_player = self.non_striker
         bowler = self.current_bowler
-        for key in payload:
-            if key == "on_strike":
-                on_strike_player = self.entity_registrar.get_entity_data(
-                    EntityType.PLAYER, payload[key]
-                )
-            elif key == "off_strike":
-                off_strike_player = self.entity_registrar.get_entity_data(
-                    EntityType.PLAYER, payload[key]
-                )
-            elif key == "bowler":
-                bowler = self.entity_registrar.get_entity_data(
-                    EntityType.PLAYER, payload[key]
-                )
-            elif key == "dismissal":
-                dismissal_payload = payload[key]
+        dismissal_payload = payload.get("dismissal")
         if dismissal_payload:
             dismissal = parse_dismissal(
-                payload["dismissal"],
+                dismissal_payload,
                 on_strike_player,
                 off_strike_player,
                 bowler,

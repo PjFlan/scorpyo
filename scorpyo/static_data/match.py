@@ -4,17 +4,17 @@ from typing import NamedTuple
 
 @dataclass
 class MatchType:
+    name: str
     shortcode: str
     innings_per_side: int
     overs: int
     days: int
     bowler_limit: int
-    name: str
 
 
-TWENTY_20 = MatchType("T20", 1, 20, 1, 4, "TWENTY20")
-ONE_DAY = MatchType("OD", 1, 50, 1, 10, "ONE DAY")
-FIRST_CLASS = MatchType("FC", 2, None, 4, None, "FIRST CLASS")
+TWENTY_20 = MatchType("TWENTY20", "T20", 1, 20, 1, 4)
+ONE_DAY = MatchType("ONE DAY", "OD", 1, 50, 1, 10)
+FIRST_CLASS = MatchType("FIRST CLASS", "FC", 2, None, 4, None)
 
 _match_types = {"T20": TWENTY_20, "OD": ONE_DAY, "FC": FIRST_CLASS}
 

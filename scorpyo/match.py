@@ -183,6 +183,9 @@ class Match(Context, Scoreable):
         batting_team_name = payload.get("batting_team")
         if not batting_team_name:
             raise ValueError("must provide batting team when starting new innings")
+        opening_bowler_name = payload.get("opening_bowler")
+        if not opening_bowler_name:
+            raise ValueError("must provide opening bowler when starting new innings")
         batting_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, batting_team_name
         )
@@ -190,24 +193,24 @@ class Match(Context, Scoreable):
         bowling_lineup = [
             lineup for lineup in self.lineups if lineup != batting_lineup
         ][0]
-        opening_bowler = self.entity_registrar.get_entity_data(
-            EntityType.PLAYER, payload["opening_bowler"]
+        opening_bowler_player = self.entity_registrar.get_entity_data(
+            EntityType.PLAYER, opening_bowler_name
         )
+        if opening_bowler_player not in bowling_lineup:
+            raise ValueError(
+                f"no bowler in bowling team {bowling_lineup.name} with "
+                f"name {opening_bowler_name}"
+            )
         num_prev_batting_inningses = len(
             [i for i in self.match_inningses if i.batting_team == batting_team]
         )
-        if opening_bowler not in bowling_lineup:
-            raise ValueError(
-                f"no bowler in bowling team {bowling_lineup.name} with "
-                f"name {opening_bowler.name}"
-            )
         ise = InningsStartedEvent(
             match_innings_num,
             num_prev_batting_inningses,
             start_time,
             batting_lineup,
             bowling_lineup,
-            opening_bowler,
+            opening_bowler_player,
         )
         message = self.on_innings_started(ise)
         return message

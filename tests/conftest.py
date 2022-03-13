@@ -1,9 +1,7 @@
-import os
 from copy import deepcopy
 
 import pytest
 
-from scorpyo import entity
 from scorpyo.engine import MatchEngine
 from scorpyo.innings import find_innings, BatterInningsState
 from scorpyo.match import Match

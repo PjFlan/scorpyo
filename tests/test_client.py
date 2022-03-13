@@ -5,12 +5,20 @@ from typing import List
 
 import pytest
 
-from scorpyo.client import MatchClient, FileSource, json_reader, CommandLineSource
+from scorpyo import client, static_data
+from scorpyo.client import (
+    MatchClient,
+    FileSource,
+    json_reader,
+    CommandLineSource,
+    CommandLineNode,
+    process_node_input,
+)
 from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG_PATH
-from tests.resources import HOME_PLAYERS
+from tests.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
@@ -135,7 +143,19 @@ def test_event_command(mock_client, mocker):
 
 
 @pytest.mark.parametrize(
-    "method,test_input",
+    "node,user_input,output",
+    [
+        (CommandLineNode(is_entity=True), "1", 1),
+        (CommandLineNode(discrete=["a", "b"]), "c", None),
+    ],
+)
+def test_node_handler(node, user_input, output):
+    processed = process_node_input(node, user_input)
+    assert processed == output
+
+
+@pytest.mark.parametrize(
+    "method,user_input",
     [
         ("show_help", "help"),
         ("close", "quit"),
@@ -143,36 +163,75 @@ def test_event_command(mock_client, mocker):
         ("show_entities", "player"),
     ],
 )
-def test_command_line_source(registrar, mocker, method, test_input):
+def test_command_line_source(registrar, mocker, method, user_input):
     source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
     patcher = mocker.patch.object(CommandLineSource, method)
     mock_input = mocker.Mock()
-    mock_input.side_effect = [test_input]
+    mock_input.side_effect = [user_input]
     mocker.patch("builtins.input", mock_input)
     source.read()
     assert patcher.called
 
 
-def test_command_line_source_ms(registrar, mocker):
+@pytest.mark.parametrize(
+    "user_inputs,expected_command",
+    [
+        (
+            ["ms", "T20", HOME_TEAM, AWAY_TEAM],
+            {"match_type": "T20", "home_team": HOME_TEAM, "away_team": AWAY_TEAM},
+        ),
+        (["rlu", "h"] + HOME_PLAYERS + ["F"], {"team": "home", "lineup": HOME_PLAYERS}),
+        (
+            ["is", HOME_TEAM, AWAY_PLAYERS[-1]],
+            {"batting_team": HOME_TEAM, "opening_bowler": AWAY_PLAYERS[-1]},
+        ),
+    ],
+)
+def test_command_line_source(registrar, mocker, user_inputs, expected_command):
     source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
     mock_input = mocker.Mock()
-    mock_input.side_effect = ["ms", "T20", "YMCA CC", "PEMBROKE CC"]
+    mock_input.side_effect = user_inputs
     mocker.patch("builtins.input", mock_input)
     source.read()
     assert len(source.command_buffer) == 1
     command = source.command_buffer[0]
-    assert command["body"]["match_type"] == "T20"
-    assert command["body"]["home_team"] == "YMCA CC"
+    assert expected_command.items() <= command["body"].items()
 
 
-def test_command_line_source_rlu(registrar, mocker):
-    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
-    mock_input = mocker.Mock()
-    inputs = ["rlu", "h"] + HOME_PLAYERS + ["F"]
-    mock_input.side_effect = inputs
-    mocker.patch("builtins.input", mock_input)
-    source.read()
-    assert len(source.command_buffer) == 1
-    command = source.command_buffer[0]
-    assert command["body"]["team"] == "home"
-    assert command["body"]["lineup"] == HOME_PLAYERS
+def test_dismissal_triggers():
+    triggers = dict()
+    dismissal_types = static_data.dismissal.get_all_types()
+    client.add_dismissal_triggers(triggers, dismissal_types)
+    assert set(triggers.keys()) == set(["dismissal", "fielder", "batter"])
+    assert triggers["batter"] == "^ro$|^hb$|^of$"
+    assert triggers["fielder"] == "^ct$|^ro$"
+    assert triggers["dismissal"] == ".*W$"
+
+
+def test_ball_completed_node_creation():
+    bc_nodes = client.create_bc_nodes()
+    expected_nodes = {
+        "bc_score_node",
+        "bc_dismissal_node",
+        "bc_fielder_node",
+        "bc_batter_node",
+    }
+    assert expected_nodes == set(bc_nodes.keys())
+
+
+@pytest.mark.parametrize(
+    "user_input,node_name,expected_triggers",
+    [
+        ("1W", "bc_score_node", {"dismissal"}),
+        ("1lb", "bc_score_node", set()),
+        ("ct", "bc_dismissal_node", {"fielder"}),
+        ("ro", "bc_dismissal_node", {"batter", "fielder"}),
+        ("b", "bc_dismissal_node", set()),
+    ],
+)
+def test_ball_completed_dismissal_triggers(user_input, node_name, expected_triggers):
+    active_triggers = set()
+    bc_nodes = client.create_bc_nodes()
+    node = bc_nodes[node_name]
+    client.check_triggers(node, user_input, active_triggers)
+    assert active_triggers == expected_triggers

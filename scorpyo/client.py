@@ -1,8 +1,9 @@
 import abc
 import json
+import re
 from collections import deque
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import IOBase
 from typing import MutableSequence
 
@@ -11,13 +12,11 @@ from scorpyo.engine import MatchEngine
 from scorpyo.entity import EntityType
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
+from scorpyo.static_data.dismissal import DismissalType
 from scorpyo.util import load_config, identity, try_int_convert
 
-"""
-Ideally in future most entity data will be persisted server side but for
-now the client can read it on startup and keep in memory
-"""
 
+# TODO pflanagan: this could probably be now moved to a sub-dir
 
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
 
@@ -170,56 +169,200 @@ class FileSource(InputSource):
         self.close()
 
 
+# beginning of CommandLineSource section
+
+
 @dataclass
 class CommandLineNode:
-    question: str
-    key: str
-    next_node: "CommandLineNode" = None
+    prompt: str = ""
+    payload_key: str = ""
+    next_nodes: list = field(default_factory=list)
     is_list: bool = False
     post_process: callable = identity
-    trigger_key: int = 0
-    discrete: frozenset = frozenset()
+    discrete: set = field(default_factory=set)
+    is_entity: bool = False
+    trigger_map: dict = field(default_factory=dict)
+    can_trigger: set = field(default_factory=set)
+    triggered_by: set = field(default_factory=set)
+    parent_field: str = ""
 
 
-match_type_options = ", ".join(
-    [f"{mt.shortcode}={mt.name}" for mt in static_data.match.get_all_types()]
-)
-ms_node_3 = CommandLineNode("Away Team: ", "away_team", post_process=try_int_convert)
-ms_node_2 = CommandLineNode(
-    "Home Team: ", "home_team", ms_node_3, post_process=try_int_convert
-)
-ms_node_1 = CommandLineNode(
-    f"Match type ({match_type_options}: ",
-    "match_type",
-    ms_node_2,
-    discrete=frozenset(static_data.match.get_all_shortcodes()),
-)
-
-rlu_node_2 = CommandLineNode(
-    "Enter player names or IDs. Press 'F' key to finish.\n",
-    "lineup",
-    is_list=True,
-    post_process=try_int_convert,
-)
-rlu_node_1 = CommandLineNode(
-    "Home (h) or away (a) lineup? ",
-    "team",
-    post_process=lambda x: {"h": "home", "a": "away"}[x],
-    next_node=rlu_node_2,
-    discrete={"h", "a"},
-)
-
-_NODES = {
-    EventType.MATCH_STARTED: [ms_node_1, ms_node_2, ms_node_3],
-    EventType.REGISTER_LINE_UP: [rlu_node_1, rlu_node_2],
-}
+def add_dismissal_triggers(triggers: dict, dismissal_types: list[DismissalType]):
+    # TODO pflanagan: could leverage a more functional approach below
+    triggers["dismissal"] = ".*W$"
+    triggers["fielder"] = "|".join(
+        [f"^{dt.shortcode}$" for dt in dismissal_types if dt.needs_fielder]
+    )
+    triggers["batter"] = "|".join(
+        [f"^{dt.shortcode}$" for dt in dismissal_types if not dt.batter_implied]
+    )
+    return triggers
 
 
-def handle_node_value(node, value):
-    if node.discrete and value not in node.discrete:
+def create_ms_nodes():
+    # MatchStarted nodes
+    match_type_options = ", ".join(
+        [f"{mt.shortcode}={mt.name}" for mt in static_data.match.get_all_types()]
+    )
+    ms_away_team_node = CommandLineNode(
+        prompt="Away Team: ",
+        payload_key="away_team",
+        is_entity=True,
+    )
+    ms_home_team_node = CommandLineNode(
+        prompt="Home Team: ",
+        payload_key="home_team",
+        next_nodes=[ms_away_team_node],
+        is_entity=True,
+    )
+    ms_match_type_node = CommandLineNode(
+        prompt=f"Match type ({match_type_options}: ",
+        payload_key="match_type",
+        next_nodes=[ms_home_team_node],
+        discrete=set(static_data.match.get_all_shortcodes()),
+    )
+    nodes = {
+        node_name: node
+        for node_name, node in locals().items()
+        if isinstance(node, CommandLineNode)
+    }
+    return nodes
+
+
+def create_rlu_nodes():
+    # RegisterLineUp nodes
+    rlu_lineup_node = CommandLineNode(
+        prompt="Enter player names or IDs. Press 'F' to finish.\n",
+        payload_key="lineup",
+        is_list=True,
+        is_entity=True,
+    )
+    rlu_team_node = CommandLineNode(
+        prompt="Home (h) or away (a) lineup? ",
+        payload_key="team",
+        next_nodes=[rlu_lineup_node],
+        post_process=lambda x: {"h": "home", "a": "away"}[x],
+        discrete={"h", "a"},
+    )
+    nodes = {
+        node_name: node
+        for node_name, node in locals().items()
+        if isinstance(node, CommandLineNode)
+    }
+    return nodes
+
+
+def create_is_nodes():
+    # InningsStarted nodes
+    is_opening_bowler_node = CommandLineNode(
+        prompt="Opening bowler: ",
+        payload_key="opening_bowler",
+        is_entity=True,
+    )
+    is_batting_team_node = CommandLineNode(
+        prompt="Batting team: ",
+        payload_key="batting_team",
+        next_nodes=[is_opening_bowler_node],
+        is_entity=True,
+    )
+    nodes = {
+        node_name: node
+        for node_name, node in locals().items()
+        if isinstance(node, CommandLineNode)
+    }
+    return nodes
+
+
+def create_bc_nodes():
+    # BallCompleted nodes
+    dismissal_types = static_data.dismissal.get_all_types()
+    options = ", ".join([f"{dt.shortcode}={dt.name}" for dt in dismissal_types])
+    dismissal_triggers = dict()
+    add_dismissal_triggers(dismissal_triggers, dismissal_types)
+
+    bc_batter_node = CommandLineNode(
+        prompt="Batter: ",
+        payload_key="batter",
+        is_entity=True,
+        triggered_by={"batter"},
+        parent_field="dismissal",
+    )
+    bc_fielder_node = CommandLineNode(
+        prompt="Fielder: ",
+        payload_key="fielder",
+        is_entity=True,
+        triggered_by={"fielder"},
+    )
+    bc_dismissal_node = CommandLineNode(
+        prompt=f"Dismissal type ({options}): ",
+        payload_key="dismissal",
+        next_nodes=[
+            bc_fielder_node,
+            bc_batter_node,
+        ],
+        trigger_map=dismissal_triggers,
+        can_trigger={"fielder", "batter"},
+        triggered_by={"dismissal"},
+        discrete=set(static_data.dismissal.get_all_shortcodes()),
+    )
+    bc_score_node = CommandLineNode(
+        prompt="Score text: ",
+        payload_key="score_text",
+        next_nodes=[bc_dismissal_node],
+        trigger_map=dismissal_triggers,
+        can_trigger={"dismissal"},
+    )
+    nodes = {
+        node_name: node
+        for node_name, node in locals().items()
+        if isinstance(node, CommandLineNode)
+    }
+    return nodes
+
+
+def create_cli_node_tree() -> dict:
+    """returns a dict of the starting node for each event type. The remaining nodes
+    can be determined by walking the node tree."""
+    starting_node_map = {}
+
+    ms_nodes = create_ms_nodes()
+    starting_node_map[EventType.MATCH_STARTED] = ms_nodes["ms_match_type_node"]
+
+    rlu_nodes = create_rlu_nodes()
+    starting_node_map[EventType.REGISTER_LINE_UP] = rlu_nodes["rlu_team_node"]
+
+    is_nodes = create_is_nodes()
+    starting_node_map[EventType.INNINGS_STARTED] = is_nodes["is_batting_team_node"]
+
+    bc_nodes = create_bc_nodes()
+    starting_node_map[EventType.BALL_COMPLETED] = bc_nodes["bc_score_node"]
+
+    return starting_node_map
+
+
+def process_node_input(node, raw_value):
+    if raw_value == "":
+        print("cannot have empty input")
+        return None
+    processed_val = raw_value
+    if node.discrete and processed_val not in node.discrete:
         print(f"value must be one of {node.discrete}")
         return None
-    return node.post_process(value)
+    if node.is_entity:
+        processed_val = try_int_convert(processed_val)
+    return node.post_process(processed_val)
+
+
+def check_triggers(node: CommandLineNode, value: str, active_triggers: set):
+    if not node.can_trigger:
+        return
+    assert not node.is_list, "cannot use triggers with list input"
+    assert isinstance(value, str), "cannot use non-string values with triggers"
+    for trigger_key in node.can_trigger:
+        assert node.trigger_map, "must specify a trigger map if node can trigger"
+        trigger_pattern = node.trigger_map[trigger_key]
+        if re.match(trigger_pattern, value):
+            active_triggers.add(trigger_key)
 
 
 class CommandLineSource(InputSource):
@@ -227,6 +370,7 @@ class CommandLineSource(InputSource):
         super().__init__(registrar)
         self.config = config["COMMAND_LINE_SOURCE"]
         self.active = True
+        self.event_nodes = create_cli_node_tree()
 
     @property
     def is_open(self):
@@ -263,23 +407,39 @@ class CommandLineSource(InputSource):
             except AttributeError:
                 print("Not a valid command. Type 'help' for usage instructions.")
                 return
-        nodes = _NODES[event_type]
-        node = nodes[0]
+        node_tree = deque()
+        starting_node = self.event_nodes[event_type]
+        node_tree.append(starting_node)
         body = {}
-        while node:
-            key = node.key
-            value = handle_node_value(node, input(node.question))
+        active_triggers = set()
+        while True:
+            try:
+                node = node_tree.pop()
+            except IndexError:
+                break
+            payload_key = node.payload_key
+            value = process_node_input(node, input(node.prompt))
             if value is None:
+                # inform the user of mistake and go again with the same node
+                node_tree.append(node)
                 continue
+            if node.triggered_by and node.triggered_by not in active_triggers:
+                continue
+            if node.parent_field:
+                section = body[node.parent_field]
+            else:
+                section = body
             if node.is_list:
                 value_list = []
                 while value != "F":
                     value_list.append(value)
-                    value = handle_node_value(node, input("> "))
-                body[key] = value_list
+                    value = process_node_input(node, input("> "))
+                section[payload_key] = value_list
             else:
-                body[key] = value
-            node = node.next_node
+                section[payload_key] = value
+            if len(node.next_nodes) > 0:
+                node_tree.extend(node.next_nodes)
+            check_triggers(node, value, active_triggers)
         command = {"event": event_type.value, "body": body}
         self.command_buffer.append(command)
 

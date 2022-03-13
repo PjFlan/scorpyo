@@ -1,9 +1,10 @@
-from typing import NamedTuple
+from dataclasses import dataclass
 
 
-class DismissalType(NamedTuple):
+@dataclass
+class DismissalType:
     name: str
-    abbrv: str
+    shortcode: str
     bowler_accredited: bool
     batter_implied: bool
     needs_fielder: bool
@@ -20,7 +21,7 @@ TIMED_OUT = DismissalType("timed out", "to", False, True, False)
 HANDLED_BALL = DismissalType("handled ball", "hb", False, False, False)
 OBSTRUCTING_FIELD = DismissalType("obstructing field", "of", False, False, False)
 
-_dismissal_type = {
+_dismissal_types = {
     "b": BOWLED,
     "ct": CAUGHT,
     "lbw": LBW,
@@ -34,7 +35,15 @@ _dismissal_type = {
 }
 
 
-def get_dismissal_type(shortcode: str):
-    if shortcode not in _dismissal_type:
+def get_dismissal_type(shortcode: str) -> DismissalType:
+    if shortcode not in _dismissal_types:
         raise ValueError(f"invalid dismissal type {shortcode}")
-    return _dismissal_type[shortcode]
+    return _dismissal_types[shortcode]
+
+
+def get_all_types() -> list[DismissalType]:
+    return _dismissal_types.values()
+
+
+def get_all_shortcodes() -> list[str]:
+    return _dismissal_types.keys()
