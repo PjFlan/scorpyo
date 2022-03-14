@@ -184,7 +184,6 @@ class CommandLineNode:
     trigger_map: dict = field(default_factory=dict)
     can_trigger: set = field(default_factory=set)
     triggered_by: set = field(default_factory=set)
-    parent_field: str = ""
 
 
 def add_dismissal_triggers(triggers: dict, dismissal_types: list[DismissalType]):
@@ -282,20 +281,19 @@ def create_bc_nodes():
 
     bc_batter_node = CommandLineNode(
         prompt="Batter: ",
-        payload_key="batter",
+        payload_key="dismissal.batter",
         is_entity=True,
         triggered_by={"batter"},
-        parent_field="dismissal",
     )
     bc_fielder_node = CommandLineNode(
         prompt="Fielder: ",
-        payload_key="fielder",
+        payload_key="dismissal.fielder",
         is_entity=True,
         triggered_by={"fielder"},
     )
     bc_dismissal_node = CommandLineNode(
         prompt=f"Dismissal type ({options}): ",
-        payload_key="dismissal",
+        payload_key="dismissal.type",
         next_nodes=[
             bc_fielder_node,
             bc_batter_node,
@@ -365,6 +363,20 @@ def check_triggers(node: CommandLineNode, value: str, active_triggers: set):
             active_triggers.add(trigger_key)
 
 
+def prepare_nested_payload(full_payload: dict, full_key: str) -> tuple[dict, str]:
+    """takes the full payload and creates nested keys, as many as necessary,
+    before returning a reference to the innermost nested dict and the name of the leaf
+    key"""
+    branches = full_key.split(".")
+    payload_key = branches.pop(-1)  # the leaf key
+    curr_branch = full_payload
+    for parent_key in branches:
+        if parent_key not in curr_branch:
+            curr_branch[parent_key] = {}
+        curr_branch = curr_branch[parent_key]
+    return curr_branch, payload_key
+
+
 class CommandLineSource(InputSource):
     def __init__(self, config, registrar: EntityRegistrar):
         super().__init__(registrar)
@@ -417,29 +429,29 @@ class CommandLineSource(InputSource):
                 node = node_tree.pop()
             except IndexError:
                 break
-            payload_key = node.payload_key
-            value = process_node_input(node, input(node.prompt))
-            if value is None:
+            if node.triggered_by and not node.triggered_by.issubset(active_triggers):
+                continue
+            input_value = process_node_input(node, input(node.prompt))
+            if input_value is None:
                 # inform the user of mistake and go again with the same node
                 node_tree.append(node)
                 continue
-            if node.triggered_by and node.triggered_by not in active_triggers:
-                continue
-            if node.parent_field:
-                section = body[node.parent_field]
+            if "." in node.payload_key:
+                payload_section, payload_key = prepare_nested_payload(
+                    body, node.payload_key
+                )
             else:
-                section = body
+                payload_section, payload_key = body, node.payload_key
+            payload_value = input_value
             if node.is_list:
-                value_list = []
-                while value != "F":
-                    value_list.append(value)
-                    value = process_node_input(node, input("> "))
-                section[payload_key] = value_list
-            else:
-                section[payload_key] = value
+                payload_value = []
+                while input_value != "F":
+                    payload_value.append(input_value)
+                    input_value = process_node_input(node, input("> "))
+            payload_section[payload_key] = payload_value
             if len(node.next_nodes) > 0:
                 node_tree.extend(node.next_nodes)
-            check_triggers(node, value, active_triggers)
+            check_triggers(node, payload_value, active_triggers)
         command = {"event": event_type.value, "body": body}
         self.command_buffer.append(command)
 

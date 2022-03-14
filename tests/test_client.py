@@ -2,6 +2,7 @@ import builtins
 import json
 from io import StringIO
 from typing import List
+from unittest import TestCase
 
 import pytest
 
@@ -185,6 +186,19 @@ def test_command_line_source(registrar, mocker, method, user_input):
             ["is", HOME_TEAM, AWAY_PLAYERS[-1]],
             {"batting_team": HOME_TEAM, "opening_bowler": AWAY_PLAYERS[-1]},
         ),
+        (["bc", "1"], {"score_text": "1"}),
+        (["bc", "1W", "b"], {"score_text": "1W", "dismissal": {"type": "b"}}),
+        (
+            ["bc", "1W", "ct", 0],
+            {"score_text": "1W", "dismissal": {"type": "ct", "fielder": 0}},
+        ),
+        (
+            ["bc", "W", "ro", 12, 0],
+            {
+                "score_text": "W",
+                "dismissal": {"type": "ro", "fielder": 0, "batter": 12},
+            },
+        ),
     ],
 )
 def test_command_line_source(registrar, mocker, user_inputs, expected_command):
@@ -195,7 +209,16 @@ def test_command_line_source(registrar, mocker, user_inputs, expected_command):
     source.read()
     assert len(source.command_buffer) == 1
     command = source.command_buffer[0]
-    assert expected_command.items() <= command["body"].items()
+    TestCase().assertDictEqual(expected_command, command["body"])
+
+
+def test_nested_payload():
+    full_payload = {"dummy_key": "dummy_value"}
+    full_key = "dismissal.batter"
+    inner_payload, inner_key = client.prepare_nested_payload(full_payload, full_key)
+    assert inner_payload == {}
+    assert inner_key == "batter"
+    assert full_payload == {"dummy_key": "dummy_value", "dismissal": {}}
 
 
 def test_dismissal_triggers():

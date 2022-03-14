@@ -22,7 +22,6 @@ def parse_dismissal(
         raise ValueError(f"dismissal type {dt} must specify batter")
     player_getter = functools.partial(registrar.get_entity_data, EntityType.PLAYER)
     payload_batter = player_getter(payload.get("batter"))
-    payload_bowler = player_getter(payload.get("bowler"))
     fielder = player_getter(payload.get("fielder"))
     if payload_batter and payload_batter not in [off_strike, on_strike]:
         raise ValueError(
@@ -30,7 +29,6 @@ def parse_dismissal(
             f"currently at the crease."
         )
     batter = payload_batter if payload_batter else on_strike
-    bowler = payload_bowler if payload_bowler else bowler
     if dt.batter_implied and not batter == on_strike:
         raise ValueError(
             f"batter specified in dismissal {dt} is not consistent "
