@@ -33,6 +33,10 @@ class Over(Context, Scoreable):
             return False
         return self._score.runs_against_bowler == 0
 
+    @property
+    def max_balls_bowled(self) -> bool:
+        return self.balls_bowled == 6
+
     def description(self) -> dict:
         output = {"over_number": self.number + 1, "bowler": self.bowler.name}
         return output
@@ -65,4 +69,4 @@ class Over(Context, Scoreable):
 
     def on_over_completed(self, oce: "OverCompletedEvent"):
         assert self.number == oce.number, "OverCompletedEvent raised for wrong over"
-        self.state = OverState.COMPLETED
+        self.state = oce.reason

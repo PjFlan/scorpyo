@@ -3,7 +3,7 @@ from copy import deepcopy
 import pytest
 
 from scorpyo.engine import MatchEngine
-from scorpyo.innings import find_innings, BatterInningsState
+from scorpyo.innings import find_innings, BatterInningsState, BatterInnings
 from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.entity import Player
@@ -62,7 +62,6 @@ class MockMatch(Match):
             for _ in range(6):
                 self.current_innings.handle_ball_completed(payload)
             oc_payload = {
-                "over_num": 0,
                 "bowler": bowler.name,
                 "reason": OverState.COMPLETED,
             }
@@ -77,6 +76,18 @@ class MockMatch(Match):
             self.apply_over(next_bowler)
         next_bowler = bowling_lineup[(next_idx + 1) % len(bowling_lineup)]
         return next_bowler
+
+    def apply_wickets(self, num_wickets):
+        next_to_dismiss = self.current_innings.striker
+        for i in range(2, 2 + num_wickets):
+            new_batter = self.current_innings.batting_lineup[i]
+            self.swap_batters(next_to_dismiss, new_batter)
+            next_to_dismiss = new_batter
+        return new_batter
+
+    def end_batter_innings(self, innings_to_end: BatterInnings):
+        innings_to_end.batting_state = BatterInningsState.DISMISSED
+        innings_to_end.on_strike_innings = None
 
 
 @pytest.fixture()

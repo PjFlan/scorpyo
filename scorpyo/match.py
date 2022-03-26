@@ -181,10 +181,10 @@ class Match(Context, Scoreable):
                 "lineups of each team"
             )
         batting_team_name = payload.get("batting_team")
-        if not batting_team_name:
+        if batting_team_name is None:
             raise ValueError("must provide batting team when starting new innings")
         opening_bowler_name = payload.get("opening_bowler")
-        if not opening_bowler_name:
+        if opening_bowler_name is None:
             raise ValueError("must provide opening bowler when starting new innings")
         batting_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, batting_team_name
@@ -217,8 +217,12 @@ class Match(Context, Scoreable):
 
     def handle_innings_completed(self, payload: dict):
         end_time = util.get_current_time()
-        reason = InningsState(payload["reason"])
-        innings_id = payload["match_innings_num"]
+        try:
+            reason = InningsState(payload["reason"])
+        except KeyError:
+            print("must supply reason on InningsCompleted payload")
+            return
+        innings_id = self.current_innings.match_innings_num
         ice = InningsCompletedEvent(innings_id, end_time, reason)
         message = self.on_innings_completed(ice)
         return message

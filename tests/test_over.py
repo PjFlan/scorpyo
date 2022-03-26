@@ -18,7 +18,6 @@ def rotate_bowlers(
     payloads = [{"score_text": "."}] * 6
     apply_ball_events(payloads, registrar, mock_innings)
     oc_payload = {
-        "over_num": 0,
         "bowler": bowlers[0],
         "reason": OverState.COMPLETED.value,
     }
@@ -30,7 +29,6 @@ def rotate_bowlers(
         mock_innings.handle_over_started(os_payload)
         apply_ball_events(payloads, registrar, mock_innings)
         oc_payload = {
-            "over_num": i,
             "bowler": bowlers[idx],
             "reason": OverState.COMPLETED.value,
         }
@@ -45,7 +43,6 @@ def test_over_completed(mock_innings: Innings, registrar: EntityRegistrar):
     apply_ball_events(payloads, registrar, mock_innings)
     assert mock_innings.striker == orig_on_strike
     oc_payload = {
-        "over_num": 0,
         "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
@@ -84,7 +81,6 @@ def test_over_completed_wicket(mock_innings: Innings, registrar: EntityRegistrar
     mock_innings.handle_batter_innings_started(bis_payload)
     assert mock_innings.striker == "Harry Tector"
     oc_payload = {
-        "over_num": 0,
         "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
@@ -97,7 +93,6 @@ def test_incorrect_get_balls_bowled(mock_innings: Innings, registrar: EntityRegi
     apply_ball_events(payloads, registrar, mock_innings)
     with pytest.raises(ValueError):
         oc_payload = {
-            "over_num": 0,
             "bowler": mock_innings.current_bowler.name,
             "reason": OverState.COMPLETED.value,
         }
@@ -110,7 +105,6 @@ def test_incorrect_legals_balls(mock_innings: Innings, registrar: EntityRegistra
     apply_ball_events(payloads, registrar, mock_innings)
     with pytest.raises(ValueError):
         oc_payload = {
-            "over_num": 0,
             "bowler": mock_innings.current_bowler.name,
             "reason": OverState.COMPLETED.value,
         }
@@ -124,7 +118,6 @@ def test_over_started(mock_innings: Innings, registrar: EntityRegistrar):
     new_bowler = "JJ Cassidy"
     assert new_bowler != mock_innings.current_bowler
     oc_payload = {
-        "over_num": 0,
         "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
@@ -150,7 +143,6 @@ def test_over_started_same_bowler(mock_innings: Innings, registrar: EntityRegist
     new_bowler = mock_innings.current_bowler
     assert new_bowler == mock_innings.current_bowler
     oc_payload = {
-        "over_num": 0,
         "bowler": mock_innings.current_bowler.name,
         "reason": OverState.COMPLETED.value,
     }
@@ -169,7 +161,7 @@ def test_over_started_exceeds_limit(mock_innings: Innings, registrar: EntityRegi
     assert len(mock_innings.overs) == max_overs
     with pytest.raises(ValueError) as exc:
         next_bowler_idx = (last_bowler_idx + 1) % len(bowlers)
-        os_payload = {"over_num": max_overs + 1, "bowler": bowlers[next_bowler_idx]}
+        os_payload = {"bowler": bowlers[next_bowler_idx]}
         mock_innings.handle_over_started(os_payload)
         assert exc.value == f"innings already has max number of overs {max_overs}"
 

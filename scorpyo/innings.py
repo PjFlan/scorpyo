@@ -129,7 +129,7 @@ class Innings(Context, Scoreable):
         return num_batters - num_already_batted
 
     @property
-    def active_batter_innings(self) -> List[BatterInnings]:
+    def active_batter_inningses(self) -> List[BatterInnings]:
         inningses = [
             i
             for i in (self.on_strike_innings, self.off_strike_innings)
@@ -299,27 +299,6 @@ class Innings(Context, Scoreable):
         bic = BatterInningsCompletedEvent(batter, state)
         return self.on_batter_innings_completed(bic)
 
-    def handle_over_completed(self, payload: dict) -> dict:
-        if "bowler" not in payload:
-            bowler = self.current_bowler
-        else:
-            bowler = self.entity_registrar.get_entity_data(
-                EntityType.PLAYER, payload["bowler"]
-            )
-            if bowler != self.current_bowler:
-                raise ValueError(
-                    "OverCompleted event raised for a bowler {bowler} who is "
-                    "not the bowler of the most recent over"
-                )
-        reason = payload.get("reason")
-        if not reason:
-            reason = OverState.COMPLETED
-        else:
-            reason = OverState(payload["reason"])
-        over_number = payload["over_num"]
-        oce = OverCompletedEvent(over_number, bowler, reason)
-        return self.on_over_completed(oce)
-
     def handle_over_started(self, payload: dict) -> dict:
         if "bowler" not in payload:
             raise ValueError("must specify bowler of new over")
@@ -338,6 +317,27 @@ class Innings(Context, Scoreable):
             )
         os = OverStartedEvent(bowler, next_over_num)
         return self.on_over_started(os)
+
+    def handle_over_completed(self, payload: dict) -> dict:
+        if "bowler" not in payload:
+            bowler = self.current_bowler
+        else:
+            bowler = self.entity_registrar.get_entity_data(
+                EntityType.PLAYER, payload["bowler"]
+            )
+            if bowler != self.current_bowler:
+                raise ValueError(
+                    "OverCompleted event raised for a bowler {bowler} who is "
+                    "not the bowler of the most recent over"
+                )
+        reason_code = payload.get("reason")
+        if not reason_code:
+            reason = OverState.COMPLETED
+        else:
+            reason = OverState(reason_code)
+        over_number = self.current_over.number
+        oce = OverCompletedEvent(over_number, bowler, reason)
+        return self.on_over_completed(oce)
 
     @record_event
     def on_ball_completed(self, bce: BallCompletedEvent) -> dict:
@@ -401,6 +401,7 @@ class Innings(Context, Scoreable):
                 "self.batting_lineup}"
             )
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
+        dismissed_innings.batting_state = bic.batting_state
         if bic.batting_state == BatterInningsState.DISMISSED:
             prev_dismissal = self.previous_ball.dismissal
             if not prev_dismissal:
@@ -470,7 +471,7 @@ class Innings(Context, Scoreable):
                 f"there are still batters remaining so cannot end the "
                 f"innings for reason: {ice.reason}"
             )
-            assert len(self.active_batter_innings) <= 1, (
+            assert len(self.active_batter_inningses) <= 1, (
                 f"there are still two batters at the crease, so cannot end "
                 f"the innings for reason {ice.reason} without terminating one of the "
                 f"batter inningses first."
@@ -491,16 +492,18 @@ class Innings(Context, Scoreable):
                 )
         self.state = ice.reason
         self.end_time = ice.end_time
-        for innings in self.active_batter_innings:
-            # TODO pflanagan: there should be some sort of mechanism for raising
-            #  events internally so that the context objects need not know which
-            #  exact handler to use, and instead the message can flow through the
-            #  natural context hierarchy from top down
-            payload = {
+        for innings in self.active_batter_inningses:
+            bic_payload = {
                 "batter": str(innings.player),
                 "reason": BatterInningsState.INNINGS_COMPLETE.value,
             }
-            self.handle_batter_innings_completed(payload)
+            self.handle_batter_innings_completed(bic_payload)
+        if self.current_over.max_balls_bowled:
+            reason_code = OverState.COMPLETED.value
+        else:
+            reason_code = OverState.INNINGS_ENDED.value
+        oc_payload = {"reason": reason_code}
+        self.handle_over_completed(oc_payload)
 
 
 class BatterInnings(Context, Scoreable):

@@ -6,7 +6,7 @@ from unittest import TestCase
 
 import pytest
 
-from scorpyo import client, static_data
+from scorpyo import client, static_data, innings, match
 from scorpyo.client import (
     MatchClient,
     FileSource,
@@ -60,10 +60,10 @@ def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar):
 
 def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatch):
     my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
-    monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    with my_client.connect() as client:
-        assert client._source is not None
-        assert client._source.is_open
+    monkeypatch.setattr(builtins, "open", lambda x: mock_file)
+    with my_client.connect() as _client:
+        assert _client._source is not None
+        assert _client._source.is_open
     assert not my_client._source.is_open
 
 
@@ -177,15 +177,19 @@ def test_command_line_source(registrar, mocker, method, user_input):
 @pytest.mark.parametrize(
     "user_inputs,expected_command",
     [
+        # MatchStarted
         (
             ["ms", "T20", HOME_TEAM, AWAY_TEAM],
             {"match_type": "T20", "home_team": HOME_TEAM, "away_team": AWAY_TEAM},
         ),
+        # RegisterLineUp
         (["rlu", "h"] + HOME_PLAYERS + ["F"], {"team": "home", "lineup": HOME_PLAYERS}),
+        # InningsStarted
         (
             ["is", HOME_TEAM, AWAY_PLAYERS[-1]],
             {"batting_team": HOME_TEAM, "opening_bowler": AWAY_PLAYERS[-1]},
         ),
+        # BallCompleted
         (["bc", "1"], {"score_text": "1"}),
         (["bc", "1W", "b"], {"score_text": "1W", "dismissal": {"type": "b"}}),
         (
@@ -199,13 +203,39 @@ def test_command_line_source(registrar, mocker, method, user_input):
                 "dismissal": {"type": "ro", "fielder": 0, "batter": 12},
             },
         ),
+        # OverStarted
+        (["os", AWAY_PLAYERS[-1]], {"bowler": AWAY_PLAYERS[-1]}),
+        # OverCompleted
+        (["oc"], {}),
+        # InningsCompleted
+        (
+            ["ic", innings.InningsState.ALL_OUT.value],
+            {"reason": innings.InningsState.ALL_OUT.value},
+        ),
+        # MatchCompleted
+        (
+            ["mc", match.MatchState.COMPLETED.value],
+            {"reason": match.MatchState.COMPLETED.value},
+        ),
+        # BatterInningsStarted
+        (["bis", HOME_PLAYERS[3]], {"batter": HOME_PLAYERS[3]}),
+        # BatterInningsCompleted
+        (
+            ["bic", HOME_PLAYERS[1], innings.BatterInningsState.DISMISSED.value],
+            {
+                "batter": HOME_PLAYERS[1],
+                "reason": innings.BatterInningsState.DISMISSED.value,
+            },
+        ),
     ],
 )
-def test_command_line_source(registrar, mocker, user_inputs, expected_command):
+def test_command_line_source(
+    registrar, mocker, user_inputs, expected_command, monkeypatch
+):
     source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
     mock_input = mocker.Mock()
     mock_input.side_effect = user_inputs
-    mocker.patch("builtins.input", mock_input)
+    monkeypatch.setattr(source, "input_reader", mock_input)
     source.read()
     assert len(source.command_buffer) == 1
     command = source.command_buffer[0]
@@ -231,30 +261,19 @@ def test_dismissal_triggers():
     assert triggers["dismissal"] == ".*W$"
 
 
-def test_ball_completed_node_creation():
-    bc_nodes = client.create_bc_nodes()
-    expected_nodes = {
-        "bc_score_node",
-        "bc_dismissal_node",
-        "bc_fielder_node",
-        "bc_batter_node",
-    }
-    assert expected_nodes == set(bc_nodes.keys())
-
-
 @pytest.mark.parametrize(
     "user_input,node_name,expected_triggers",
     [
-        ("1W", "bc_score_node", {"dismissal"}),
-        ("1lb", "bc_score_node", set()),
-        ("ct", "bc_dismissal_node", {"fielder"}),
-        ("ro", "bc_dismissal_node", {"batter", "fielder"}),
-        ("b", "bc_dismissal_node", set()),
+        ("1W", "bc_node_0", {"dismissal"}),
+        ("1lb", "bc_node_0", set()),
+        ("ct", "bc_node_1", {"fielder"}),
+        ("ro", "bc_node_1", {"batter", "fielder"}),
+        ("b", "bc_node_1", set()),
     ],
 )
 def test_ball_completed_dismissal_triggers(user_input, node_name, expected_triggers):
     active_triggers = set()
-    bc_nodes = client.create_bc_nodes()
-    node = bc_nodes[node_name]
+    nodes = client.create_nodes()
+    node = nodes[node_name]
     client.check_triggers(node, user_input, active_triggers)
     assert active_triggers == expected_triggers
