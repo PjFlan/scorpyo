@@ -9,9 +9,16 @@ import pytest
 from scorpyo import client, static_data, innings, match
 from scorpyo.client.client import MatchClient
 from scorpyo.client.reader import json_reader
-from scorpyo.client.source import FileSource, CommandLineNode, process_node_input, \
-    CommandLineSource, prepare_nested_payload, add_dismissal_triggers, create_nodes, \
-    check_triggers
+from scorpyo.client.source import (
+    FileSource,
+    CommandLineNode,
+    process_node_input,
+    CommandLineSource,
+    prepare_nested_payload,
+    add_dismissal_triggers,
+    create_nodes,
+    check_triggers,
+)
 from scorpyo.engine import MatchEngine
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG_PATH
@@ -23,6 +30,7 @@ TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
 
 class MockStringIO(StringIO):
     """a wrapper around StringIO to write onto newlines and flip the buffer"""
+
     pos = 0
 
     def __init__(self):

@@ -43,9 +43,7 @@ class MatchClient:
     def register_source(self):
         """a list of sources, ordered according to which should be consumed first"""
         source_name = self.config["CLIENT"]["source"]
-        source_klass = {"file": FileSource, "command_line": CommandLineSource}[
-            source_name
-        ]
+        source_klass = {"file": FileSource, "cli": CommandLineSource}[source_name]
         self._source = source_klass(self.config, self.registrar)
 
     def on_event_command(self, command: dict):

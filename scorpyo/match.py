@@ -29,6 +29,7 @@ from scorpyo.entity import Team, MatchTeam
 # also add an api to allow the client to request an overview
 from scorpyo.static_data.match import MatchState
 
+
 class Match(Context, Scoreable):
     def __init__(
         self,

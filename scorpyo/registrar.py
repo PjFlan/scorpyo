@@ -9,8 +9,8 @@ from scorpyo.entity import Team
 
 
 class FileLoaderVisitor:
-    def __init__(self, config: dict):
-        self.source_dir = config["file_source"]
+    def __init__(self, entity_config: dict):
+        self.source_dir = entity_config["source"]
 
     def visit_player(self) -> list[Player]:
         file_source = os.path.join(self.source_dir, "player.csv")
