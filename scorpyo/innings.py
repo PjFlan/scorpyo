@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 from typing import Optional, List
 
 import scorpyo.util as util
@@ -21,6 +20,7 @@ from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
 from scorpyo.entity import Player
 from scorpyo.score import Scoreable, Score
+from scorpyo.static_data.innings import InningsState, BatterInningsState
 
 
 class Innings(Context, Scoreable):
@@ -219,17 +219,15 @@ class Innings(Context, Scoreable):
         return output
 
     def ascii_status(self):
-        # TODO pflanagan: should return batters at the crease, current bowler,
-        #  current ball number, total runs, wickets, extras etc.
         resp = f"{self.total_runs}-{self.wickets_down} after {self.overs_bowled}\n\n"
         for i, b_innings in enumerate(
             [self.on_strike_innings, self.off_strike_innings]
         ):
             if not b_innings:
                 continue
-            resp += f"{b_innings.player}: {b_innings.status()} \n"
+            resp += f"{b_innings.player}: {b_innings.snapshot()} \n"
         resp += "\n"
-        resp += self.current_bowler_innings.status()
+        resp += self.current_bowler_innings.snapshot()
         return resp
 
     def get_batter_innings(self, player: Player) -> "BatterInnings":
@@ -649,22 +647,6 @@ class BowlerInnings(Context, Scoreable):
     def on_over_started(self, ose: OverStartedEvent):
         over = self.innings.get_over_by_number(ose.number)
         self._overs.append(over)
-
-
-class InningsState(enum.Enum):
-    IN_PROGRESS = "ip"
-    ALL_OUT = "ao"
-    OVERS_COMPLETE = "oc"
-    DECLARED = "d"
-    TARGET_REACHED = "tr"
-
-
-class BatterInningsState(enum.Enum):
-    IN_PROGRESS = "ip"
-    RETIRED_OUT = "ro"
-    RETIRED_NOT_OUT = "rno"
-    DISMISSED = "d"
-    INNINGS_COMPLETE = "ic"
 
 
 def find_innings(player: Player, inningses: list):

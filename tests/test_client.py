@@ -7,16 +7,12 @@ from unittest import TestCase
 import pytest
 
 from scorpyo import client, static_data, innings, match
-from scorpyo.client import (
-    MatchClient,
-    FileSource,
-    json_reader,
-    CommandLineSource,
-    CommandLineNode,
-    process_node_input,
-)
+from scorpyo.client.client import MatchClient
+from scorpyo.client.reader import json_reader
+from scorpyo.client.source import FileSource, CommandLineNode, process_node_input, \
+    CommandLineSource, prepare_nested_payload, add_dismissal_triggers, create_nodes, \
+    check_triggers
 from scorpyo.engine import MatchEngine
-from scorpyo.entity import EntityType
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG_PATH
 from tests.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
@@ -26,8 +22,7 @@ TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
 
 
 class MockStringIO(StringIO):
-    """a wrapper around StringIO to write onto newlines and flip buffer"""
-
+    """a wrapper around StringIO to write onto newlines and flip the buffer"""
     pos = 0
 
     def __init__(self):
@@ -101,8 +96,8 @@ def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypa
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_file.write_lines(LINES)
     patched = mocker.patch.object(MatchClient, "handle_command")
-    with mock_client.connect() as client:
-        client.process()
+    with mock_client.connect() as _client:
+        _client.process()
     assert patched.call_count == 3
     assert not mock_client._source.has_data
 
@@ -117,8 +112,8 @@ def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypat
     mock_client._source.reader = json_reader
     mock_file.write(TEST_JSON)
     patched = mocker.patch.object(MatchClient, "handle_command")
-    with mock_client.connect() as client:
-        client.process()
+    with mock_client.connect() as _client:
+        _client.process()
     assert patched.call_count == 3
     assert not mock_client._source.has_data
 
@@ -147,7 +142,7 @@ def test_event_command(mock_client, mocker):
     "node,user_input,output",
     [
         (CommandLineNode(is_entity=True), "1", 1),
-        (CommandLineNode(discrete=["a", "b"]), "c", None),
+        (CommandLineNode(discrete={"a", "b"}), "c", None),
     ],
 )
 def test_node_handler(node, user_input, output):
@@ -245,7 +240,7 @@ def test_command_line_source(
 def test_nested_payload():
     full_payload = {"dummy_key": "dummy_value"}
     full_key = "dismissal.batter"
-    inner_payload, inner_key = client.prepare_nested_payload(full_payload, full_key)
+    inner_payload, inner_key = prepare_nested_payload(full_payload, full_key)
     assert inner_payload == {}
     assert inner_key == "batter"
     assert full_payload == {"dummy_key": "dummy_value", "dismissal": {}}
@@ -254,8 +249,8 @@ def test_nested_payload():
 def test_dismissal_triggers():
     triggers = dict()
     dismissal_types = static_data.dismissal.get_all_types()
-    client.add_dismissal_triggers(triggers, dismissal_types)
-    assert set(triggers.keys()) == set(["dismissal", "fielder", "batter"])
+    add_dismissal_triggers(triggers, dismissal_types)
+    assert set(triggers.keys()) == {"dismissal", "fielder", "batter"}
     assert triggers["batter"] == "^ro$|^hb$|^of$"
     assert triggers["fielder"] == "^ct$|^ro$"
     assert triggers["dismissal"] == ".*W$"
@@ -273,7 +268,7 @@ def test_dismissal_triggers():
 )
 def test_ball_completed_dismissal_triggers(user_input, node_name, expected_triggers):
     active_triggers = set()
-    nodes = client.create_nodes()
+    nodes = create_nodes()
     node = nodes[node_name]
-    client.check_triggers(node, user_input, active_triggers)
+    check_triggers(node, user_input, active_triggers)
     assert active_triggers == expected_triggers

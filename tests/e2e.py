@@ -1,4 +1,4 @@
-from scorpyo.client import MatchClient
+from scorpyo.client.client import MatchClient
 from scorpyo.engine import MatchEngine
 from scorpyo.registrar import EntityRegistrar
 from tests.common import TEST_CONFIG, TEST_CONFIG_PATH

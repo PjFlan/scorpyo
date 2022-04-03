@@ -27,6 +27,8 @@ from scorpyo.entity import Team, MatchTeam
 # TODO pflanagan: untangle the status, snapshot, overview mess. I think an event either
 # returns a snapshot, or an overview (which is a full scorecard essentially). Can then
 # also add an api to allow the client to request an overview
+from scorpyo.static_data.match import MatchState
+
 class Match(Context, Scoreable):
     def __init__(
         self,
@@ -287,9 +289,3 @@ class Match(Context, Scoreable):
 
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent):
         return self.current_innings.on_batter_innings_started(bis)
-
-
-class MatchState(enum.Enum):
-    COMPLETED = 0
-    RAINED_OFF = 1
-    IN_PROGRESS = 2

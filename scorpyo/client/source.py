@@ -1,104 +1,16 @@
 import abc
-import json
 import os
 import re
 from collections import deque
-from contextlib import contextmanager
 from dataclasses import dataclass, field
-from io import IOBase
-from typing import MutableSequence
 
 from scorpyo import static_data, innings, match
-from scorpyo.engine import MatchEngine
+from scorpyo.client.reader import json_reader, plain_reader
 from scorpyo.entity import EntityType
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.static_data.dismissal import DismissalType
-from scorpyo.util import load_config, identity, try_int_convert
-
-
-# TODO pflanagan: this could probably be now moved to a sub-dir
-
-DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
-
-
-class MatchClient:
-    def __init__(
-        self, registrar: EntityRegistrar, engine: MatchEngine, config=DEFAULT_CFG_DIR
-    ):
-        self.registrar = registrar
-        self.engine = engine
-        self._pending_commands: deque = deque()
-        self.engine_sequence = 0
-        if isinstance(config, str):
-            self.config = load_config(config)
-        elif isinstance(config, dict):
-            self.config = config
-        self._source: InputSource = None
-        self.register_source()
-
-    def process(self):
-        """do something with the new data"""
-        while self._source.is_open:
-            self._source.read()
-            for command in self._source.query():
-                self.handle_command(command)
-
-    def handle_command(self, command: dict):
-        """interpret a command and send it to the engine, registrar or otherwise"""
-        if "body" not in command:
-            raise ValueError(f"missing body on incoming command" f" {command}")
-        self.on_event_command(command)
-
-    def register_source(self):
-        """a list of sources, ordered according to which should be consumed first"""
-        source_name = self.config["CLIENT"]["source"]
-        source_klass = {"file": FileSource, "command_line": CommandLineSource}[
-            source_name
-        ]
-        self._source = source_klass(self.config, self.registrar)
-
-    def on_event_command(self, command: dict):
-        """pass to the engine for processing and confirm the engine acked the command
-        the client should know the internal protocol accepted by the engine and
-        format commands accordingly. For now I will maintain this protocol distinctly
-        between engine and client but if it grows, may need to move to a protobuf"""
-        e_type = command.get("event")
-        if not e_type:
-            raise ValueError(f"no event type passed in event command")
-        try:
-            # TODO: probably should be passing in the event id rather than raw string
-            event_type = EventType(e_type)
-        except KeyError:
-            raise ValueError(f"event command payload has an invalid type {e_type}")
-        if "body" not in command:
-            raise ValueError(f"no data passed in event command")
-        command["command_id"] = self.engine_sequence
-        command["event"] = event_type
-        self.engine_sequence += 1
-        self._pending_commands.append(command)
-        self.engine.on_event(command)
-
-    def on_message(self, message: dict):
-        message_id = message.get("message_id")
-        if message_id is None:
-            raise ValueError(f"received message from engine with know id {message}")
-        if len(self._pending_commands) == 0:
-            raise ValueError(f"received message from engine without pending commands")
-        oldest_command = self._pending_commands.popleft()
-        command_id = oldest_command["command_id"]
-        assert message_id == command_id, (
-            f"message_id does not match command_id of "
-            "oldest pending command {message_id} != {command_id}"
-        )
-        print(json.dumps(message, indent=4))
-
-    @contextmanager
-    def connect(self):
-        self.engine.register_client(self)
-        self._source.connect()
-        yield self
-        self._source.close()
+from scorpyo.util import identity, try_int_convert
 
 
 class InputSource(abc.ABC):
@@ -109,7 +21,7 @@ class InputSource(abc.ABC):
         try:
             self.root_dir = config["CLIENT"]["root_dir"]
         except KeyError:
-            self.root_dir = "./"
+            self.root_dir = "../"
         self.registrar = registrar
         self.is_connected = False
         self.command_buffer: deque = deque()
@@ -171,9 +83,6 @@ class FileSource(InputSource):
     def read(self):
         self.reader_func(self.file_handler, self.command_buffer)
         self.close()
-
-
-# beginning of CommandLineSource section
 
 
 @dataclass
@@ -517,14 +426,3 @@ class CommandLineSource(InputSource):
     def show_entities(self, entity_type: EntityType):
         for ent in self.registrar.get_all_of_type(entity_type):
             print(f"{ent.unique_id} - {ent.name}")
-
-
-def json_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
-    commands = json.loads(file_handler.read())
-    for command in commands:
-        command_buffer.append(command)
-
-
-def plain_reader(file_handler: IOBase, command_buffer: MutableSequence[str]):
-    for line in file_handler:
-        command_buffer.append(line.strip())

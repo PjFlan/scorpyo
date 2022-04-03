@@ -1,3 +1,4 @@
+import enum
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -10,6 +11,12 @@ class MatchType:
     overs: int
     days: int
     bowler_limit: int
+
+
+class MatchState(enum.Enum):
+    COMPLETED = 0
+    RAINED_OFF = 1
+    IN_PROGRESS = 2
 
 
 TWENTY_20 = MatchType("TWENTY20", "T20", 1, 20, 1, 4)
