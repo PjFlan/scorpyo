@@ -28,7 +28,7 @@ class Entity:
         return self.name
 
 
-class  Player(Entity):
+class Player(Entity):
     def __init__(self, unique_id: int, name: str):
         super().__init__(unique_id, name)
 
