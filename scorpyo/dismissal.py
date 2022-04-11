@@ -10,6 +10,7 @@ from scorpyo.util import get_current_time
 
 def parse_dismissal(
     payload: dict,
+    innings: "Innings",
     on_strike: Player,
     off_strike: Player,
     bowler: Player,
@@ -34,11 +35,17 @@ def parse_dismissal(
             f"batter specified in dismissal {dt} is not consistent "
             f"with current striker: {on_strike}"
         )
-    if dt.needs_fielder and not fielder:
-        raise ValueError(
-            f"dismissal type {dt} needs an associated fielder but "
-            f"none was specified"
-        )
+    if dt.needs_fielder:
+        if not fielder:
+            raise ValueError(
+                f"dismissal type {dt} needs an associated fielder but "
+                f"none was specified"
+            )
+        if fielder not in innings.bowling_lineup:
+            raise ValueError(
+                f"fielder is not in the bowling team lineup, cannot be attributed to "
+                f"the dismissal"
+            )
     return Dismissal(dt, batter, bowler, fielder, get_current_time())
 
 

@@ -61,8 +61,8 @@ def test_over_completed(mock_innings: Innings, registrar: EntityRegistrar):
 # should make a helper class that applies a wicket
 def test_over_completed_wicket(mock_innings: Innings, registrar: EntityRegistrar):
     payloads = [{"score_text": "1"}] * 5
-    thrower = "Callum Donnelly"
-    batter_out = "Padraic Flanagan"
+    thrower = 12
+    batter_out = 0
     wicket_payload = {
         "score_text": "1W",
         "dismissal": {

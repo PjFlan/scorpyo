@@ -45,4 +45,14 @@ bc
 
 bc
 1
+
+bc
+W
+ct
+11
+
+bic
+1
+d
+
 quit

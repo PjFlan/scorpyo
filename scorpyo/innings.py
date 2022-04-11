@@ -252,6 +252,7 @@ class Innings(Context, Scoreable):
         if dismissal_payload:
             dismissal = parse_dismissal(
                 dismissal_payload,
+                self,
                 on_strike_player,
                 off_strike_player,
                 bowler,

@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 from typing import Optional
 
-from scorpyo.entity import EntityType
+from scorpyo.entity import EntityType, Entity
 from scorpyo.entity import Player
 from scorpyo.entity import Team
 
@@ -57,7 +57,7 @@ class EntityRegistrar:
 
     def get_entity_data(
         self, entity_type: EntityType, item_reference: any
-    ) -> Optional[Player]:
+    ) -> Optional[Entity]:
         if item_reference is None:
             return None
         search_list = self._store[entity_type]
