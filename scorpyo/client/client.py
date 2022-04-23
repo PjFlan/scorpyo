@@ -1,8 +1,8 @@
-import json
 from collections import deque
 from contextlib import contextmanager
+from typing import Optional
 
-from scorpyo.client.source import InputSource, FileSource, CommandLineSource
+from scorpyo.client.handler import ClientHandler, FileHandler, CommandLineHandler
 from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
@@ -12,7 +12,7 @@ from scorpyo.util import load_config
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
 
 
-class MatchClient:
+class EngineClient:
     def __init__(
         self, registrar: EntityRegistrar, engine: MatchEngine, config=DEFAULT_CFG_DIR
     ):
@@ -24,14 +24,14 @@ class MatchClient:
             self.config = load_config(config)
         elif isinstance(config, dict):
             self.config = config
-        self._source: InputSource = None
-        self.register_source()
+        self._handler: Optional[ClientHandler] = None
+        self.register_handler()
 
     def process(self):
         """do something with the new data"""
-        while self._source.is_open:
-            self._source.read()
-            for command in self._source.query():
+        while self._handler.is_open:
+            self._handler.read()
+            for command in self._handler.query():
                 self.handle_command(command)
 
     def handle_command(self, command: dict):
@@ -40,11 +40,11 @@ class MatchClient:
             raise ValueError(f"missing body on incoming command" f" {command}")
         self.on_event_command(command)
 
-    def register_source(self):
-        """a list of sources, ordered according to which should be consumed first"""
-        source_name = self.config["CLIENT"]["source"]
-        source_klass = {"file": FileSource, "cli": CommandLineSource}[source_name]
-        self._source = source_klass(self.config, self.registrar)
+    def register_handler(self):
+        """a list of handlers, ordered according to which should be consumed first"""
+        handler_name = self.config["CLIENT"]["handler"]
+        handler_klass = {"file": FileHandler, "cli": CommandLineHandler}[handler_name]
+        self._handler = handler_klass(self.config, self.registrar)
 
     def on_event_command(self, command: dict):
         """pass to the engine for processing and confirm the engine acked the command
@@ -79,12 +79,12 @@ class MatchClient:
             f"message_id does not match command_id of "
             "oldest pending command {message_id} != {command_id}"
         )
-        print(json.dumps(message, indent=4))
+        self._handler.on_message(message)
 
     @contextmanager
     def connect(self):
-        """connect to registered source to begin receiving commands"""
+        """connect to registered handler to begin receiving commands"""
         self.engine.register_client(self)
-        self._source.connect()
+        self._handler.connect()
         yield self
-        self._source.close()
+        self._handler.close()

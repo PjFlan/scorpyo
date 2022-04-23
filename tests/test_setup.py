@@ -4,12 +4,12 @@ from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
-from .common import TEST_CONFIG
+from .common import TEST_ENTITIES_CONFIG
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 def test_registrar():
-    registrar = EntityRegistrar(TEST_CONFIG)
+    registrar = EntityRegistrar(TEST_ENTITIES_CONFIG)
     assert len(registrar.get_all_of_type(EntityType.PLAYER)) > 0
     assert len(registrar.get_all_of_type(EntityType.TEAM)) > 0
     player = registrar.get_entity_data(EntityType.PLAYER, HOME_PLAYERS[0])

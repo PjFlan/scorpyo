@@ -8,9 +8,9 @@ from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.entity import Player
 from scorpyo.registrar import EntityType, EntityRegistrar, EventRegistrar
-from scorpyo.static_data import match
+from scorpyo.definitions import match
 from scorpyo.entity import MatchTeam
-from .common import RESOURCES_PATH, TEST_CONFIG
+from .common import TEST_ENTITIES_CONFIG
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -79,6 +79,7 @@ class MockMatch(Match):
 
     def apply_wickets(self, num_wickets):
         next_to_dismiss = self.current_innings.striker
+        new_batter = None
         for i in range(2, 2 + num_wickets):
             new_batter = self.current_innings.batting_lineup[i]
             self.swap_batters(next_to_dismiss, new_batter)
@@ -92,7 +93,7 @@ class MockMatch(Match):
 
 @pytest.fixture()
 def registrar():
-    ent_registrar = EntityRegistrar(TEST_CONFIG)
+    ent_registrar = EntityRegistrar(TEST_ENTITIES_CONFIG)
     return ent_registrar
 
 

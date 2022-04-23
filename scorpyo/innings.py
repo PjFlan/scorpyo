@@ -20,7 +20,7 @@ from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
 from scorpyo.entity import Player
 from scorpyo.score import Scoreable, Score
-from scorpyo.static_data.innings import InningsState, BatterInningsState
+from scorpyo.definitions.innings import InningsState, BatterInningsState
 
 
 class Innings(Context, Scoreable):

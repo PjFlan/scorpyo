@@ -10,7 +10,7 @@ from scorpyo.event import (
 )
 import scorpyo.util as util
 from scorpyo.registrar import EventRegistrar
-from scorpyo.static_data.match import get_match_type
+from scorpyo.definitions.match import get_match_type
 
 
 # TODO: implement rollback, and pushing processed events onto a listener stream
@@ -118,7 +118,7 @@ class MatchEngine(Context):
         self.current_match.state = mce.reason
         return self.current_match.overview()
 
-    def register_client(self, client: "MatchClient"):
+    def register_client(self, client: "EngineClient"):
         self._score_listeners.append(client)
 
 

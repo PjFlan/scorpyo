@@ -3,7 +3,7 @@ from copy import deepcopy
 from scorpyo.event import InningsStartedEvent
 from scorpyo.innings import Innings
 from scorpyo.registrar import EntityRegistrar
-from scorpyo.static_data.match import FIRST_CLASS
+from scorpyo.definitions.match import FIRST_CLASS
 from tests.conftest import MockMatch
 
 

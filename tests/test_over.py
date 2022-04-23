@@ -5,7 +5,7 @@ import pytest
 from scorpyo.innings import Innings
 from scorpyo.over import OverState
 from scorpyo.registrar import EntityRegistrar
-from scorpyo.static_data.match import MatchType
+from scorpyo.definitions.match import MatchType
 from tests.common import apply_ball_events
 
 

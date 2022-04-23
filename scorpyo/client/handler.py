@@ -1,19 +1,20 @@
 import abc
+import json
 import os
 import re
 from collections import deque
 from dataclasses import dataclass, field
 
-from scorpyo import static_data, innings, match
+from scorpyo import definitions, innings, match
 from scorpyo.client.reader import json_reader, plain_reader
 from scorpyo.entity import EntityType
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
-from scorpyo.static_data.dismissal import DismissalType
+from scorpyo.definitions.dismissal import DismissalType
 from scorpyo.util import identity, try_int_convert
 
 
-class InputSource(abc.ABC):
+class ClientHandler(abc.ABC):
     """Mostly a wrapper around various sources of match commands (files, command line,
     web, database etc.)"""
 
@@ -51,15 +52,19 @@ class InputSource(abc.ABC):
         has yet to be processed upstream"""
         pass
 
+    @abc.abstractmethod
+    def on_message(self, message: dict):
+        pass
+
     @property
     def has_data(self):
         return self.command_buffer
 
 
-class FileSource(InputSource):
+class FileHandler(ClientHandler):
     def __init__(self, config: dict, registrar: EntityRegistrar):
         super().__init__(config, registrar)
-        self.config = config["FILE_SOURCE"]
+        self.config = config["FILE_HANDLER"]
         self.url: str = os.path.join(self.root_dir, self.config["url"])
         self.reader_func = {"json": json_reader, "plain": plain_reader}[
             self.config["reader"]
@@ -83,6 +88,9 @@ class FileSource(InputSource):
     def read(self):
         self.reader_func(self.file_handler, self.command_buffer)
         self.close()
+
+    def on_message(self, message: dict):
+        print(json.dumps(message, indent=4))
 
 
 @dataclass
@@ -114,7 +122,7 @@ def add_dismissal_triggers(triggers: dict, dismissal_types: list[DismissalType])
 def create_nodes():
     # MatchStarted nodes
     match_type_options = ", ".join(
-        [f"{mt.shortcode}={mt.name}" for mt in static_data.match.get_all_types()]
+        [f"{mt.shortcode}={mt.name}" for mt in definitions.match.get_all_types()]
     )
     ms_node_2 = CommandLineNode(
         prompt="Away Team: ",
@@ -131,7 +139,7 @@ def create_nodes():
         prompt=f"Match type ({match_type_options}): ",
         payload_key="match_type",
         next_nodes=[ms_node_1],
-        discrete=set(static_data.match.get_all_shortcodes()),
+        discrete=set(definitions.match.get_all_shortcodes()),
     )
 
     # RegisterLineUp nodes
@@ -163,7 +171,7 @@ def create_nodes():
     )
 
     # BallCompleted nodes
-    dismissal_types = static_data.dismissal.get_all_types()
+    dismissal_types = definitions.dismissal.get_all_types()
     options = ", ".join([f"{dt.shortcode}={dt.name}" for dt in dismissal_types])
     dismissal_triggers = dict()
     add_dismissal_triggers(dismissal_triggers, dismissal_types)
@@ -190,7 +198,7 @@ def create_nodes():
         trigger_map=dismissal_triggers,
         can_trigger={"fielder", "batter"},
         triggered_by={"dismissal"},
-        discrete=set(static_data.dismissal.get_all_shortcodes()),
+        discrete=set(definitions.dismissal.get_all_shortcodes()),
     )
     bc_node_0 = CommandLineNode(
         prompt="Score text: ",
@@ -324,10 +332,10 @@ def file_input_reader(lines: list[str]):
     return _read
 
 
-class CommandLineSource(InputSource):
+class CommandLineHandler(ClientHandler):
     def __init__(self, config, registrar: EntityRegistrar):
         super().__init__(config, registrar)
-        self.config = config["COMMAND_LINE_SOURCE"]
+        self.config = config["COMMAND_LINE_HANDLER"]
         self.active = True
         self.event_nodes = create_nodes()
         self.starting_nodes_map = get_starting_event_nodes(self.event_nodes)
@@ -413,6 +421,9 @@ class CommandLineSource(InputSource):
             check_triggers(node, payload_value, active_triggers)
         command = {"event": event_type.value, "body": body}
         self.command_buffer.append(command)
+
+    def on_message(self, message: dict):
+        print(json.dumps(message, indent=4))
 
     def show_help(self):
         print(

@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
-from typing import NamedTuple
 
 from scorpyo.dismissal import Dismissal
-from scorpyo.static_data.match import MatchType
+from scorpyo.definitions.match import MatchType
 from scorpyo.entity import Player
 from scorpyo.score import Score
 from scorpyo.entity import Team, MatchTeam

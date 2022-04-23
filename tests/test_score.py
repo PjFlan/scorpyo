@@ -1,6 +1,6 @@
 import pytest
 
-from scorpyo.static_data import score
+from scorpyo.definitions import score
 
 
 # TODO pflanagan: more extensive testing needed here. For example, test that the sum

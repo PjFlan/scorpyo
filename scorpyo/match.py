@@ -1,4 +1,3 @@
-import enum
 from typing import Optional, List
 
 import scorpyo.util as util
@@ -15,7 +14,8 @@ from scorpyo.event import (
     record_event,
 )
 from scorpyo.entity import EntityType
-from scorpyo.innings import Innings, InningsState
+from scorpyo.definitions.innings import InningsState
+from scorpyo.innings import Innings
 from scorpyo.score import Scoreable
 from scorpyo.entity import Team, MatchTeam
 
@@ -27,7 +27,7 @@ from scorpyo.entity import Team, MatchTeam
 # TODO pflanagan: untangle the status, snapshot, overview mess. I think an event either
 # returns a snapshot, or an overview (which is a full scorecard essentially). Can then
 # also add an api to allow the client to request an overview
-from scorpyo.static_data.match import MatchState
+from scorpyo.definitions.match import MatchState
 
 
 class Match(Context, Scoreable):

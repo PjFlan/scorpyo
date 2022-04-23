@@ -6,14 +6,14 @@ from unittest import TestCase
 
 import pytest
 
-from scorpyo import client, static_data, innings, match
-from scorpyo.client.client import MatchClient
+from scorpyo import client, definitions, innings, match
+from scorpyo.client.client import EngineClient
 from scorpyo.client.reader import json_reader
-from scorpyo.client.source import (
-    FileSource,
+from scorpyo.client.handler import (
+    FileHandler,
     CommandLineNode,
     process_node_input,
-    CommandLineSource,
+    CommandLineHandler,
     prepare_nested_payload,
     add_dismissal_triggers,
     create_nodes,
@@ -57,23 +57,23 @@ def mock_file():
 
 @pytest.fixture
 def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar):
-    my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
+    my_client = EngineClient(registrar, mock_engine, TEST_CONFIG_PATH)
     return my_client
 
 
 def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatch):
-    my_client = MatchClient(registrar, mock_engine, TEST_CONFIG_PATH)
+    my_client = EngineClient(registrar, mock_engine, TEST_CONFIG_PATH)
     monkeypatch.setattr(builtins, "open", lambda x: mock_file)
     with my_client.connect() as _client:
-        assert _client._source is not None
-        assert _client._source.is_open
-    assert not my_client._source.is_open
+        assert _client._handler is not None
+        assert _client._handler.is_open
+    assert not my_client._handler.is_open
 
 
 def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    config = {"FILE_SOURCE": {"url": "/path/to/url", "reader": "plain"}}
-    file_source = FileSource(config, registrar)
+    config = {"FILE_HANDLER": {"url": "/path/to/url", "reader": "plain"}}
+    file_source = FileHandler(config, registrar)
     file_source.connect()
     mock_file.write_lines(LINES[0:2])
     file_source.read()
@@ -82,8 +82,8 @@ def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
 
 def test_file_source_json_reader(registrar, mock_file, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    config = {"FILE_SOURCE": {"url": "/path/to/url", "reader": "json"}}
-    file_source = FileSource(config, registrar)
+    config = {"FILE_HANDLER": {"url": "/path/to/url", "reader": "json"}}
+    file_source = FileHandler(config, registrar)
     file_source.connect()
     mock_file.write(TEST_JSON)
     file_source.read()
@@ -97,37 +97,37 @@ def test_file_source_json_reader(registrar, mock_file, monkeypatch):
 
 def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
     config = {
-        "CLIENT": {"source": "file"},
-        "FILE_SOURCE": {"url": "/path/to/url", "reader": "plain"},
+        "CLIENT": {"handler": "file"},
+        "FILE_HANDLER": {"url": "/path/to/url", "reader": "plain"},
     }
-    mock_client = MatchClient(registrar, mock_engine, config)
+    mock_client = EngineClient(registrar, mock_engine, config)
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_file.write_lines(LINES)
-    patched = mocker.patch.object(MatchClient, "handle_command")
+    patched = mocker.patch.object(EngineClient, "handle_command")
     with mock_client.connect() as _client:
         _client.process()
     assert patched.call_count == 3
-    assert not mock_client._source.has_data
+    assert not mock_client._handler.has_data
 
 
 def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     config = {
-        "CLIENT": {"source": "file"},
-        "FILE_SOURCE": {"url": "/path/to/url", "reader": "json"},
+        "CLIENT": {"handler": "file"},
+        "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
     }
-    mock_client = MatchClient(registrar, mock_engine, config)
-    mock_client._source.reader = json_reader
+    mock_client = EngineClient(registrar, mock_engine, config)
+    mock_client._handler.reader = json_reader
     mock_file.write(TEST_JSON)
-    patched = mocker.patch.object(MatchClient, "handle_command")
+    patched = mocker.patch.object(EngineClient, "handle_command")
     with mock_client.connect() as _client:
         _client.process()
     assert patched.call_count == 3
-    assert not mock_client._source.has_data
+    assert not mock_client._handler.has_data
 
 
 def test_event_command_handler(mock_client, mocker):
-    event_patch = mocker.patch.object(MatchClient, "on_event_command")
+    event_patch = mocker.patch.object(EngineClient, "on_event_command")
     test_command = {"event": "null", "body": {"dummy2": "test"}}
     mock_client.handle_command(test_command)
     assert event_patch.called_with(test_command["body"])
@@ -168,8 +168,8 @@ def test_node_handler(node, user_input, output):
     ],
 )
 def test_command_line_source(registrar, mocker, method, user_input):
-    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
-    patcher = mocker.patch.object(CommandLineSource, method)
+    source = CommandLineHandler({"COMMAND_LINE_HANDLER": {}}, registrar)
+    patcher = mocker.patch.object(CommandLineHandler, method)
     mock_input = mocker.Mock()
     mock_input.side_effect = [user_input]
     mocker.patch("builtins.input", mock_input)
@@ -235,7 +235,7 @@ def test_command_line_source(registrar, mocker, method, user_input):
 def test_command_line_source(
     registrar, mocker, user_inputs, expected_command, monkeypatch
 ):
-    source = CommandLineSource({"COMMAND_LINE_SOURCE": {}}, registrar)
+    source = CommandLineHandler({"COMMAND_LINE_HANDLER": {}}, registrar)
     mock_input = mocker.Mock()
     mock_input.side_effect = user_inputs
     monkeypatch.setattr(source, "input_reader", mock_input)
@@ -256,7 +256,7 @@ def test_nested_payload():
 
 def test_dismissal_triggers():
     triggers = dict()
-    dismissal_types = static_data.dismissal.get_all_types()
+    dismissal_types = definitions.dismissal.get_all_types()
     add_dismissal_triggers(triggers, dismissal_types)
     assert set(triggers.keys()) == {"dismissal", "fielder", "batter"}
     assert triggers["batter"] == "^ro$|^hb$|^of$"
