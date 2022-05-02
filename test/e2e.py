@@ -1,7 +1,7 @@
 from scorpyo.client.client import EngineClient
 from scorpyo.engine import MatchEngine
 from scorpyo.registrar import EntityRegistrar
-from tests.common import TEST_ENTITIES_CONFIG, TEST_CONFIG_PATH
+from test.common import TEST_ENTITIES_CONFIG, TEST_CONFIG_PATH
 
 
 def main():

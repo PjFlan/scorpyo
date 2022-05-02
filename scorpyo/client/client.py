@@ -1,8 +1,15 @@
+import logging
 from collections import deque
 from contextlib import contextmanager
+from time import sleep
 from typing import Optional
 
-from scorpyo.client.handler import ClientHandler, FileHandler, CommandLineHandler
+from scorpyo.client.handler import (
+    ClientHandler,
+    FileHandler,
+    CommandLineHandler,
+    WSHandler,
+)
 from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
@@ -10,6 +17,10 @@ from scorpyo.util import load_config
 
 
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
+DEFAULT_TIMEOUT = 0.5
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class EngineClient:
@@ -26,6 +37,10 @@ class EngineClient:
             self.config = config
         self._handler: Optional[ClientHandler] = None
         self.register_handler()
+        try:
+            self._timeout = int(self.config["CLIENT"]["power_save_timeout"])
+        except (KeyError, ValueError):
+            self._timeout = DEFAULT_TIMEOUT
 
     def process(self):
         """do something with the new data"""
@@ -33,6 +48,7 @@ class EngineClient:
             self._handler.read()
             for command in self._handler.query():
                 self.handle_command(command)
+            sleep(self._timeout)
 
     def handle_command(self, command: dict):
         """interpret a command and send it to the engine, registrar or otherwise"""
@@ -43,7 +59,11 @@ class EngineClient:
     def register_handler(self):
         """a list of handlers, ordered according to which should be consumed first"""
         handler_name = self.config["CLIENT"]["handler"]
-        handler_klass = {"file": FileHandler, "cli": CommandLineHandler}[handler_name]
+        handler_klass = {
+            "file": FileHandler,
+            "cli": CommandLineHandler,
+            "ws": WSHandler,
+        }[handler_name]
         self._handler = handler_klass(self.config, self.registrar)
 
     def on_event_command(self, command: dict):
@@ -86,5 +106,8 @@ class EngineClient:
         """connect to registered handler to begin receiving commands"""
         self.engine.register_client(self)
         self._handler.connect()
-        yield self
-        self._handler.close()
+        try:
+            yield self
+        finally:
+            logging.info("closing handler")
+            self._handler.close()

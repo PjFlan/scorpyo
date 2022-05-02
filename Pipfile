@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 pytest = "*"
 black = "*"
+websocket-server = "*"
+websocket-client = "*"
 
 [dev-packages]
 

@@ -6,7 +6,7 @@ from scorpyo.innings import Innings
 from scorpyo.over import OverState
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.definitions.match import MatchType
-from tests.common import apply_ball_events
+from test.common import apply_ball_events
 
 
 def rotate_bowlers(

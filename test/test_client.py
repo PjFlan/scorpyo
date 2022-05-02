@@ -1,28 +1,30 @@
 import builtins
 import json
+import time
 from io import StringIO
 from typing import List
 from unittest import TestCase
 
 import pytest
+from websocket_server import WebsocketServer
 
-from scorpyo import client, definitions, innings, match
+from scorpyo import definitions, innings, match
+from scorpyo.client.cli_nodes import CommandLineNode, add_dismissal_triggers
 from scorpyo.client.client import EngineClient
 from scorpyo.client.reader import json_reader
 from scorpyo.client.handler import (
     FileHandler,
-    CommandLineNode,
     process_node_input,
     CommandLineHandler,
     prepare_nested_payload,
-    add_dismissal_triggers,
     create_nodes,
     check_triggers,
+    WSHandler,
 )
 from scorpyo.engine import MatchEngine
 from scorpyo.registrar import EntityRegistrar
-from tests.common import TEST_CONFIG_PATH
-from tests.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
+from test.common import TEST_CONFIG_PATH
+from test.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
 
 LINES = ["test line 1", "test line 2", "test line 3"]
 TEST_JSON = '[{"a": "test line 1"}, {"b": "test line 2"}, {"c": "test line 3"}]'
@@ -62,8 +64,12 @@ def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar):
 
 
 def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatch):
-    my_client = EngineClient(registrar, mock_engine, TEST_CONFIG_PATH)
-    monkeypatch.setattr(builtins, "open", lambda x: mock_file)
+    config = {
+        "CLIENT": {"handler": "file"},
+        "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
+    }
+    monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
+    my_client = EngineClient(registrar, mock_engine, config)
     with my_client.connect() as _client:
         assert _client._handler is not None
         assert _client._handler.is_open
@@ -97,7 +103,7 @@ def test_file_source_json_reader(registrar, mock_file, monkeypatch):
 
 def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
     config = {
-        "CLIENT": {"handler": "file"},
+        "CLIENT": {"handler": "file", "power_save_timeout": "0"},
         "FILE_HANDLER": {"url": "/path/to/url", "reader": "plain"},
     }
     mock_client = EngineClient(registrar, mock_engine, config)
@@ -113,7 +119,7 @@ def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypa
 def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     config = {
-        "CLIENT": {"handler": "file"},
+        "CLIENT": {"handler": "file", "power_save_timeout": "0"},
         "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
     }
     mock_client = EngineClient(registrar, mock_engine, config)
@@ -130,20 +136,13 @@ def test_event_command_handler(mock_client, mocker):
     event_patch = mocker.patch.object(EngineClient, "on_event_command")
     test_command = {"event": "null", "body": {"dummy2": "test"}}
     mock_client.handle_command(test_command)
-    assert event_patch.called_with(test_command["body"])
+    event_patch.assert_called_with(test_command)
 
 
 def test_command_missing_body(mock_client):
     with pytest.raises(ValueError):
         bad_command = {"event": "null"}
         mock_client.handle_command(bad_command)
-
-
-def test_event_command(mock_client, mocker):
-    handler_patch = mocker.patch.object(MatchEngine, "handle_event")
-    event = {"event": "ms", "body": {"noop": "noop"}}
-    mock_client.on_event_command(event)
-    assert handler_patch.called_with({"noop": "noop"})
 
 
 @pytest.mark.parametrize(
@@ -174,7 +173,7 @@ def test_command_line_source(registrar, mocker, method, user_input):
     mock_input.side_effect = [user_input]
     mocker.patch("builtins.input", mock_input)
     source.read()
-    assert patcher.called
+    patcher.assert_called()
 
 
 @pytest.mark.parametrize(
@@ -280,3 +279,35 @@ def test_ball_completed_dismissal_triggers(user_input, node_name, expected_trigg
     node = nodes[node_name]
     check_triggers(node, user_input, active_triggers)
     assert active_triggers == expected_triggers
+
+
+def test_ws_handler_connect(mock_file, mocker, registrar, mock_engine, monkeypatch):
+    config = {
+        "CLIENT": {"handler": "ws"},
+        "WEB_SOCKET_HANDLER": {"host": "127.0.0.1", "port": "13254"},
+    }
+    mock_server = mocker.Mock()
+    monkeypatch.setattr(WSHandler, "_setup_server", lambda *x, **y: mock_server)
+    run_patcher = mocker.patch.object(mock_server, "run_forever")
+    ws_handler = WSHandler(config, registrar)
+    assert ws_handler._server is None
+    ws_handler.connect()
+    assert ws_handler._server is not None
+    assert ws_handler.is_open()
+    run_patcher.assert_called_once()
+
+
+def test_ws_handler_close(mock_file, mocker, registrar, mock_engine, monkeypatch):
+    config = {
+        "CLIENT": {"handler": "ws"},
+        "WEB_SOCKET_HANDLER": {"host": "127.0.0.1", "port": "13254"},
+    }
+    mock_server = mocker.Mock()
+    monkeypatch.setattr(WSHandler, "_setup_server", lambda *x, **y: mock_server)
+    close_patcher = mocker.patch.object(mock_server, "shutdown_gracefully")
+    ws_handler = WSHandler(config, registrar)
+    assert ws_handler._server is None
+    ws_handler.connect()
+    assert ws_handler._server is not None
+    ws_handler.close()
+    close_patcher.assert_called_once()

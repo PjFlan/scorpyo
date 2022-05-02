@@ -1,6 +1,6 @@
 from scorpyo.engine import MatchEngine
 from scorpyo.match import MatchState
-from tests.resources import HOME_TEAM, AWAY_TEAM
+from test.resources import HOME_TEAM, AWAY_TEAM
 
 
 def test_match_started(registrar):

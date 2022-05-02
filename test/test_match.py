@@ -4,7 +4,7 @@ from scorpyo.event import InningsStartedEvent
 from scorpyo.innings import Innings
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.definitions.match import FIRST_CLASS
-from tests.conftest import MockMatch
+from test.conftest import MockMatch
 
 
 def test_match_target_single_innings(
