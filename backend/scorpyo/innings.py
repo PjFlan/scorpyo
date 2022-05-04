@@ -281,9 +281,9 @@ class Innings(Context, Scoreable):
             try:
                 player = self.next_batter
             except IndexError:
-                LOGGER.warning("cannot process new batter innings as there are no "
-                               "players left"
-                               )
+                LOGGER.warning(
+                    "cannot process new batter innings as there are no " "players left"
+                )
                 return EVENT_ERROR_SENTINEL
         else:
             player = self.entity_registrar.get_entity_data(
@@ -309,8 +309,9 @@ class Innings(Context, Scoreable):
             EntityType.PLAYER, payload["bowler"]
         )
         if bowler not in self.bowling_lineup:
-            LOGGER.warning(f"bowler {bowler} does not play for team "
-                           f"{self.bowling_lineup}")
+            LOGGER.warning(
+                f"bowler {bowler} does not play for team " f"{self.bowling_lineup}"
+            )
             return EVENT_ERROR_SENTINEL
         next_over_num = len(self.overs)
         max_overs_allowed = self.match.max_overs()

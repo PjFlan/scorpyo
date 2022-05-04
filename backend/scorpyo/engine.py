@@ -22,6 +22,7 @@ from scorpyo.definitions.match import get_match_type
 # TODO pflanagan: should each context object have some sort of validator dependency
 #  that can wrap all of the validation for a given command?
 
+
 class MatchEngine(Context):
     """
     Receives a stream of match events (commands) and processes the event
@@ -48,7 +49,9 @@ class MatchEngine(Context):
     def on_event(self, event_command: dict):
         event_type = event_command.get("event")
         if not event_type:
-            LOGGER.warning(f"no event_type specified on incoming command {event_command}")
+            LOGGER.warning(
+                f"no event_type specified on incoming command {event_command}"
+            )
             return
         self._events.append(event_command)
         event_message = self.handle_event(event_type, event_command["body"])
@@ -103,9 +106,10 @@ class MatchEngine(Context):
         match_id = payload.get("match_id")
         reason = payload.get("reason")
         if match_id != self.current_match.match_id:
-            LOGGER.warning("match_id from event payload {match_id} does not equal "
-                           "current match_id {self.current_match.match_id}"
-                           )
+            LOGGER.warning(
+                "match_id from event payload {match_id} does not equal "
+                "current match_id {self.current_match.match_id}"
+            )
             return EVENT_ERROR_SENTINEL
         mce = MatchCompletedEvent(match_id, end_time, reason)
         self.on_match_completed(mce)
