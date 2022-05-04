@@ -1,7 +1,7 @@
 import enum
 
 from scorpyo.context import Context
-from scorpyo.entity import EntityType, Entity
+from scorpyo.entity import EntityType
 from scorpyo.match import Match, MatchState
 from scorpyo.event import (
     EventType,
@@ -9,15 +9,18 @@ from scorpyo.event import (
     MatchCompletedEvent,
 )
 import scorpyo.util as util
+from scorpyo.util import EVENT_ERROR_SENTINEL, LOGGER
 from scorpyo.registrar import EventRegistrar
 from scorpyo.definitions.match import get_match_type
 
 
-# TODO: implement rollback, and pushing processed events onto a listener stream
-# If anything goes wrong the engine should lock itself until the issue resolve (but
-# not crash). Also need to implement an API for querying the state of the match
+# TODO pflanagan: implement rollback, and pushing processed events onto a listener
+# stream. If anything goes wrong the engine should lock itself until the issue resolve
+# (but not crash). Also need to implement an API for querying the state of the match
 # for future applications like MatchReporter to consume and format
 
+# TODO pflanagan: should each context object have some sort of validator dependency
+#  that can wrap all of the validation for a given command?
 
 class MatchEngine(Context):
     """
@@ -45,9 +48,8 @@ class MatchEngine(Context):
     def on_event(self, event_command: dict):
         event_type = event_command.get("event")
         if not event_type:
-            raise ValueError(
-                f"no event_type specified on incoming command " f"{event_command}"
-            )
+            LOGGER.warning(f"no event_type specified on incoming command {event_command}")
+            return
         self._events.append(event_command)
         event_message = self.handle_event(event_type, event_command["body"])
         message = {
@@ -75,11 +77,12 @@ class MatchEngine(Context):
 
     def handle_match_started(self, payload: dict):
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
-            raise ValueError(
+            LOGGER.warning(
                 f"match_id {self.current_match.match_id} is still in "
                 f"progress, cannot start a new match until this is "
                 f"completed"
             )
+            return EVENT_ERROR_SENTINEL
         start_time = util.get_current_time()
         match_type = get_match_type(payload["match_type"])
         # TODO pflanagan: this will be retrieved from persistent storage
@@ -99,10 +102,11 @@ class MatchEngine(Context):
         end_time = util.get_current_time()
         match_id = payload.get("match_id")
         reason = payload.get("reason")
-        assert match_id == self.current_match.match_id, (
-            "match_id from event payload {match_id} "
-            "does not equal current match_id {self.current_match.match_id}"
-        )
+        if match_id != self.current_match.match_id:
+            LOGGER.warning("match_id from event payload {match_id} does not equal "
+                           "current match_id {self.current_match.match_id}"
+                           )
+            return EVENT_ERROR_SENTINEL
         mce = MatchCompletedEvent(match_id, end_time, reason)
         self.on_match_completed(mce)
         return mce

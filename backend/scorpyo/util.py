@@ -1,6 +1,14 @@
+import logging
 import time
 
 import configparser
+
+
+LOGGER = logging.getLogger("scorpyo")
+logging.basicConfig(level=logging.INFO)
+
+
+EVENT_ERROR_SENTINEL = "EVENT_ERROR"
 
 
 def load_config(config_file):

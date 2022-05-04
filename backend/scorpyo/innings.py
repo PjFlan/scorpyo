@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional, List
 
 import scorpyo.util as util
+from util import LOGGER, EVENT_ERROR_SENTINEL
 from scorpyo.context import Context
 from scorpyo.dismissal import Dismissal, parse_dismissal
 from scorpyo.event import (
@@ -111,7 +112,8 @@ class Innings(Context, Scoreable):
         try:
             next_batter = self.batting_lineup[next_batter_index]
         except IndexError as e:
-            raise e
+            LOGGER.error("requested next batter but lineup does not contain one")
+            return EVENT_ERROR_SENTINEL
         return next_batter
 
     @property
@@ -279,9 +281,10 @@ class Innings(Context, Scoreable):
             try:
                 player = self.next_batter
             except IndexError:
-                raise ValueError(
-                    "cannot process new batter innings as there are no players left"
-                )
+                LOGGER.warning("cannot process new batter innings as there are no "
+                               "players left"
+                               )
+                return EVENT_ERROR_SENTINEL
         else:
             player = self.entity_registrar.get_entity_data(
                 EntityType.PLAYER, payload.get("batter")
@@ -300,20 +303,22 @@ class Innings(Context, Scoreable):
 
     def handle_over_started(self, payload: dict) -> dict:
         if "bowler" not in payload:
-            raise ValueError("must specify bowler of new over")
+            LOGGER.warning("must specify bowler of new over")
+            return EVENT_ERROR_SENTINEL
         bowler = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["bowler"]
         )
         if bowler not in self.bowling_lineup:
-            raise ValueError(
-                f"bowler {bowler} does not play for team {self.bowling_lineup}"
-            )
+            LOGGER.warning(f"bowler {bowler} does not play for team "
+                           f"{self.bowling_lineup}")
+            return EVENT_ERROR_SENTINEL
         next_over_num = len(self.overs)
         max_overs_allowed = self.match.max_overs()
         if next_over_num >= max_overs_allowed:
-            raise ValueError(
+            LOGGER.warning(
                 f"innings already has max number of overs {max_overs_allowed}"
             )
+            return EVENT_ERROR_SENTINEL
         os = OverStartedEvent(bowler, next_over_num)
         return self.on_over_started(os)
 
@@ -325,10 +330,11 @@ class Innings(Context, Scoreable):
                 EntityType.PLAYER, payload["bowler"]
             )
             if bowler != self.current_bowler:
-                raise ValueError(
+                LOGGER.warning(
                     "OverCompleted event raised for a bowler {bowler} who is "
                     "not the bowler of the most recent over"
                 )
+                return EVENT_ERROR_SENTINEL
         reason_code = payload.get("reason")
         if not reason_code:
             reason = OverState.COMPLETED
@@ -342,10 +348,11 @@ class Innings(Context, Scoreable):
     def on_ball_completed(self, bce: BallCompletedEvent) -> dict:
         super().update_score(bce)
         if self._dismissal_pending:
-            raise ValueError(
+            LOGGER.warning(
                 "received BallCompletedEvent before "
                 "BatterInningsCompleted event while dismissal is pending"
             )
+            return EVENT_ERROR_SENTINEL
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
         self.ball_in_match_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
@@ -368,10 +375,11 @@ class Innings(Context, Scoreable):
     @record_event
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent) -> dict:
         if self.on_strike_innings and self.off_strike_innings:
-            raise ValueError(
+            LOGGER.warning(
                 "there are already two batters at the crease. Must "
                 "complete one of their innings before beginning a new one"
             )
+            return EVENT_ERROR_SENTINEL
         try:
             existing = find_innings(bis.batter, self.batter_inningses)
         except ValueError:
@@ -380,10 +388,11 @@ class Innings(Context, Scoreable):
             existing
             and not existing.batting_state != BatterInningsState.RETIRED_NOT_OUT
         ):
-            raise ValueError(
+            LOGGER.warning(
                 "batter {existing.batter} has already batted and cannot "
                 "bat again (current state {existing.batting_state})"
             )
+            return EVENT_ERROR_SENTINEL
         new_innings = BatterInnings(bis.batter, self, len(self.batter_inningses) + 1)
         self.batter_inningses.append(new_innings)
         if not self.on_strike_innings:
@@ -395,32 +404,36 @@ class Innings(Context, Scoreable):
     @record_event
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent) -> dict:
         if bic.batter not in self.batting_lineup:
-            raise ValueError(
+            LOGGER.warning(
                 "batter {bic.batter} is not part of batting team {"
                 "self.batting_lineup}"
             )
+            return EVENT_ERROR_SENTINEL
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
         dismissed_innings.batting_state = bic.batting_state
         if bic.batting_state == BatterInningsState.DISMISSED:
             prev_dismissal = self.previous_ball.dismissal
             if not prev_dismissal:
-                raise ValueError(
+                LOGGER.warning(
                     "inconsistent state: batter innings completed via "
                     "dismissal but previous delivery has no associated "
                     "dismissal"
                 )
+                return EVENT_ERROR_SENTINEL
             elif prev_dismissal.batter != bic.batter:
-                raise ValueError(
+                LOGGER.warning(
                     f"batter dismissed in previous ball: "
                     f"{prev_dismissal.batter} does not equal batter "
                     f"whose innings has just completed: {bic.batter}"
                 )
+                return EVENT_ERROR_SENTINEL
             if dismissed_innings.batting_state != BatterInningsState.DISMISSED:
-                raise ValueError(
+                LOGGER.warning(
                     "inconsistent state: batter innings completed via a"
                     "dismissal but batter is currently in state: "
                     "{dismissed_innings.batting_state}"
                 )
+                return EVENT_ERROR_SENTINEL
         if dismissed_innings == self.on_strike_innings:
             self.on_strike_innings = None
         else:
@@ -440,12 +453,14 @@ class Innings(Context, Scoreable):
     @record_event
     def on_over_started(self, os: OverStartedEvent) -> dict:
         if os.bowler == self.current_bowler:
-            raise ValueError("bowler {player} cannot bowl two overs in a row")
+            LOGGER.warning(f"bowler {os.bowler} cannot bowl two overs in a row")
+            return EVENT_ERROR_SENTINEL
         if self.current_over.state == OverState.IN_PROGRESS:
-            raise ValueError(
+            LOGGER.warning(
                 "Existing over has not yet completed. Send an "
                 "OverCompleted event before sending an OverStarted event"
             )
+            return EVENT_ERROR_SENTINEL
         new_over = Over(os.number, os.bowler, self)
         self.overs.append(new_over)
         try:
@@ -456,39 +471,47 @@ class Innings(Context, Scoreable):
             )
             self.bowler_inningses.append(bowler_innings)
         if bowler_innings.overs_completed == self.match.max_bowler_overs:
-            raise ValueError(
+            LOGGER.warning(
                 f"bowler {os.bowler} has already bowled their full "
                 f"allotment of overs"
             )
+            return EVENT_ERROR_SENTINEL
         self.bowler_innings = bowler_innings
         bowler_innings.on_over_started(os)
         return new_over.description()
 
     def terminate(self, ice: InningsCompletedEvent):
         if ice.reason == InningsState.ALL_OUT:
-            assert len(self.yet_to_bat) == 0, (
-                f"there are still batters remaining so cannot end the "
-                f"innings for reason: {ice.reason}"
-            )
-            assert len(self.active_batter_inningses) <= 1, (
-                f"there are still two batters at the crease, so cannot end "
-                f"the innings for reason {ice.reason} without terminating one of the "
-                f"batter inningses first."
-            )
+            if len(self.yet_to_bat) != 0:
+                LOGGER.warning(
+                    f"there are still batters remaining so cannot end the "
+                    f"innings for reason: {ice.reason}"
+                )
+                return EVENT_ERROR_SENTINEL
+            if len(self.active_batter_inningses) > 1:
+                LOGGER.warning(
+                    f"there are still two batters at the crease, so cannot end "
+                    f"the innings for reason {ice.reason} without terminating one of the "
+                    f"batter inningses first."
+                )
+                return EVENT_ERROR_SENTINEL
         if ice.reason == InningsState.OVERS_COMPLETE:
-            assert len(self.overs) == self.match.max_overs(), (
-                f"the allotted number of overs has not been bowled so cannot "
-                f"end the innings for reason {ice.reason}"
-            )
+            if len(self.overs) != self.match.max_overs():
+                LOGGER.warning(
+                    f"the allotted number of overs has not been bowled so cannot "
+                    f"end the innings for reason {ice.reason}"
+                )
+                return EVENT_ERROR_SENTINEL
         if ice.reason == InningsState.TARGET_REACHED:
             if not self.target or self.total_runs < self.target:
-                raise AssertionError(
+                LOGGER.warning(
                     f"there is either no valid target that can be "
                     f"reached in this innings or the target has not "
                     f"been reached, so cannot end the innings for "
                     f"reason {ice.reason}. target={self.target} current_score="
                     f"{self.total_runs}"
                 )
+                return EVENT_ERROR_SENTINEL
         self.state = ice.reason
         self.end_time = ice.end_time
         for innings in self.active_batter_inningses:
@@ -631,7 +654,7 @@ class BowlerInnings(Context, Scoreable):
     def on_ball_completed(self, bce: BallCompletedEvent):
         curr_over = self.current_over
         if curr_over.balls_bowled == 6 and bce.ball_score.is_valid_delivery():
-            raise ValueError("over has more than 6 legal deliveries")
+            LOGGER.warning("over has more than 6 legal deliveries")
         super().update_score(bce)
         if bce.dismissal and bce.dismissal.bowler_accredited():
             self.wickets += 1
@@ -639,7 +662,7 @@ class BowlerInnings(Context, Scoreable):
     def on_over_completed(self, oce: OverCompletedEvent):
         curr_over = self.current_over
         if curr_over.balls_bowled < 6 and oce.reason == OverState.COMPLETED:
-            raise ValueError(
+            LOGGER.warning(
                 "over cannot have completed with less than 6 legal "
                 " deliveries bowled unless the innings ended"
             )
@@ -654,4 +677,4 @@ def find_innings(player: Player, inningses: list):
     for innings in inningses:
         if innings.player == player:
             return innings
-    raise ValueError(f"no innings found for player: {player}")
+    LOGGER.warning(f"no innings found for player: {player}")

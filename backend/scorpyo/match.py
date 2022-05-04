@@ -1,6 +1,7 @@
 from typing import Optional, List
 
 import scorpyo.util as util
+from scorpyo.util import LOGGER, EVENT_ERROR_SENTINEL
 from scorpyo.context import Context
 from scorpyo.event import (
     BallCompletedEvent,
@@ -162,9 +163,11 @@ class Match(Context, Scoreable):
 
     def validate(self):
         if len(self.match_inningses) == self.max_inningses:
-            raise ValueError(f"Match already has {self.max_inningses} innings")
+            LOGGER.warning(f"Match already has {self.max_inningses} innings")
+            return EVENT_ERROR_SENTINEL
         if len(self.match_inningses) > 0 and not self.match_inningses[-1].is_complete:
-            raise ValueError("Previous innings has not yet ended.")
+            LOGGER.warning("Previous innings has not yet ended.")
+            return EVENT_ERROR_SENTINEL
 
     def handle_innings_started(self, payload: dict):
         start_time = util.get_current_time()
@@ -175,20 +178,24 @@ class Match(Context, Scoreable):
             self.current_innings
             and self.current_innings.state == InningsState.IN_PROGRESS
         ):
-            raise ValueError(
+            LOGGER.warning(
                 "cannot start an innings while another one is still in progress."
             )
+            return EVENT_ERROR_SENTINEL
         if not self.home_lineup or not self.away_lineup:
-            raise ValueError(
+            LOGGER.warning(
                 "cannot start an innings without first defining the "
                 "lineups of each team"
             )
+            return EVENT_ERROR_SENTINEL
         batting_team_name = payload.get("batting_team")
         if batting_team_name is None:
-            raise ValueError("must provide batting team when starting new innings")
+            LOGGER.warning("must provide batting team when starting new innings")
+            return EVENT_ERROR_SENTINEL
         opening_bowler_name = payload.get("opening_bowler")
         if opening_bowler_name is None:
-            raise ValueError("must provide opening bowler when starting new innings")
+            LOGGER.warning("must provide opening bowler when starting new innings")
+            return EVENT_ERROR_SENTINEL
         batting_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, batting_team_name
         )
@@ -200,10 +207,11 @@ class Match(Context, Scoreable):
             EntityType.PLAYER, opening_bowler_name
         )
         if opening_bowler_player not in bowling_lineup:
-            raise ValueError(
+            LOGGER.warning(
                 f"no bowler in bowling team {bowling_lineup.name} with "
                 f"name {opening_bowler_name}"
             )
+            return EVENT_ERROR_SENTINEL
         num_prev_batting_inningses = len(
             [i for i in self.match_inningses if i.batting_team == batting_team]
         )
@@ -233,14 +241,16 @@ class Match(Context, Scoreable):
     def handle_team_lineup(self, payload: dict):
         home_or_away = payload.get("team")
         if not home_or_away or home_or_away not in ["home", "away"]:
-            raise ValueError(
+            LOGGER.warning(
                 f"must specify whether team is home or away when "
                 f"registering a lineup"
             )
+            return EVENT_ERROR_SENTINEL
         team_obj = {"home": self.home_lineup, "away": self.away_lineup}[home_or_away]
         lineup = payload.get("lineup")
         if not lineup:
-            raise ValueError("must provide lineup when registering a lineup")
+            LOGGER.warning("must provide lineup when registering a lineup")
+            return EVENT_ERROR_SENTINEL
         team_obj.add_lineup(
             self.entity_registrar.get_from_names(EntityType.PLAYER, payload["lineup"])
         )
@@ -264,19 +274,22 @@ class Match(Context, Scoreable):
     def on_innings_completed(self, ice: InningsCompletedEvent):
         innings = self.current_innings
         if not innings:
-            raise ValueError(
+            LOGGER.warning(
                 f"cannot complete an innings when there are no existing " f"inningses"
             )
+            return EVENT_ERROR_SENTINEL
         if self.current_innings.state != InningsState.IN_PROGRESS:
-            raise ValueError(
+            LOGGER.warning(
                 f"innings {innings.match_innings_num} is not in "
                 f"progress so cannot complete it"
             )
+            return EVENT_ERROR_SENTINEL
         if innings.match_innings_num != ice.match_innings_num:
-            raise ValueError(
+            LOGGER.warning(
                 f"the innings number of the InningsCompletedEvent does "
                 f"not match the current_innings number"
             )
+            return EVENT_ERROR_SENTINEL
         innings.terminate(ice)
         self.num_innings_completed += 1
         return innings.overview()
