@@ -22,6 +22,7 @@ from scorpyo.client.handler import (
     WSHandler,
 )
 from scorpyo.engine import MatchEngine
+from scorpyo.error import EngineError
 from scorpyo.registrar import EntityRegistrar
 from test.common import TEST_CONFIG_PATH
 from test.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
@@ -140,7 +141,7 @@ def test_event_command_handler(mock_client, mocker):
 
 
 def test_command_missing_body(mock_client):
-    with pytest.raises(ValueError):
+    with pytest.raises(EngineError):
         bad_command = {"event": "null"}
         mock_client.handle_command(bad_command)
 

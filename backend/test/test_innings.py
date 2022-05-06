@@ -1,5 +1,7 @@
 import pytest
 
+from scorpyo.definitions.match import MatchType
+from scorpyo.error import EngineError
 from scorpyo.event import InningsCompletedEvent
 from scorpyo.innings import Innings, InningsState, BatterInningsState
 from scorpyo.over import OverState
@@ -71,13 +73,13 @@ def test_innings_completed_all_out(
     assert set(mock_innings.yet_to_bat) == set(expected_ytb)
     assert set(batters_at_crease) == set(actual_atc)
     payload = {"reason": InningsState.ALL_OUT}
-    with pytest.raises(AssertionError) as exc:
+    with pytest.raises(EngineError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match(r"there are still batters remaining")
     next_to_dismiss = new_batter
     new_batter = mock_innings.batting_lineup[-1]
     mock_match.swap_batters(next_to_dismiss, new_batter)
-    with pytest.raises(AssertionError) as exc:
+    with pytest.raises(EngineError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match(r"there are still two batters at the crease")
     # apply the final wicket manually
@@ -92,7 +94,7 @@ def test_innings_completed_overs_complete(mock_match: MockMatch, mock_innings: I
         "over_num": 21,
         "reason": InningsState.OVERS_COMPLETE,
     }
-    with pytest.raises(AssertionError) as exc:
+    with pytest.raises(EngineError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("the allotted number of overs has not been bowled")
     mock_match.apply_over(next_bowler)
@@ -105,7 +107,7 @@ def test_innings_completed_not_in_progress(
 ):
     payload = {"reason": InningsState.OVERS_COMPLETE}
     mock_innings.state = InningsState.OVERS_COMPLETE
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(EngineError) as exc:
         mock_match.handle_innings_completed(payload)
     assert exc.match("innings 0 is not in progress")
 
@@ -115,7 +117,7 @@ def test_innings_completed_target_reached(mock_match: MockMatch, mock_innings: I
     innings_complete_payload = {
         "reason": InningsState.TARGET_REACHED,
     }
-    with pytest.raises(AssertionError) as exc:
+    with pytest.raises(EngineError) as exc:
         mock_match.handle_innings_completed(innings_complete_payload)
     assert exc.match("target has not been reached.*target=100 current_score=0")
     mock_innings._score.runs_off_bat = 101
@@ -147,6 +149,7 @@ def test_innings_completed_cleanup(
 
 def test_innings_numbers(mock_match: MockMatch, mock_innings: Innings, monkeypatch):
     mock_match.max_overs = lambda: 1
+    mock_match.match_type = MatchType("dummy", "dmy", 2, 20, 1, 10)
     second_innings_payload = {
         "batting_team": mock_innings.bowling_team.name,
         "opening_bowler": mock_innings.batting_lineup[10].name,

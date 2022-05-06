@@ -4,7 +4,9 @@ from enum import Enum
 
 from scorpyo.context import Context
 from scorpyo.entity import Player
+from scorpyo.error import EngineError, RejectReason
 from scorpyo.score import Scoreable
+from scorpyo.util import LOGGER
 
 
 class OverState(Enum):
@@ -68,5 +70,8 @@ class Over(Context, Scoreable):
         super().update_score(bce)
 
     def on_over_completed(self, oce: "OverCompletedEvent"):
-        assert self.number == oce.number, "OverCompletedEvent raised for wrong over"
+        if self.number != oce.number:
+            msg = "OverCompletedEvent raised for wrong over"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         self.state = oce.reason

@@ -1,5 +1,6 @@
 import pytest
 
+from scorpyo.error import EngineError
 from scorpyo.innings import Innings, BatterInningsState
 from scorpyo.registrar import EntityRegistrar
 from .common import apply_ball_events
@@ -42,7 +43,7 @@ def test_caught_fielder_not_valid(mock_innings: Innings, registrar: EntityRegist
             },
         }
     ]
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(EngineError) as exc:
         apply_ball_events(payloads, registrar, mock_innings)
 
 
@@ -81,7 +82,7 @@ def test_run_out_missing_batter(mock_innings: Innings, registrar: EntityRegistra
             },
         }
     ]
-    with pytest.raises(ValueError):
+    with pytest.raises(EngineError):
         apply_ball_events(payloads, registrar, mock_innings)
     assert "dismissal type run out must specify batter"
 

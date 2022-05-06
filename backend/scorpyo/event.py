@@ -20,6 +20,7 @@ class EventType(Enum):
     BATTER_INNINGS_COMPLETED = "bic"
     BATTER_INNINGS_STARTED = "bis"
     REGISTER_LINE_UP = "rlu"
+    REJECT = "rj"
 
 
 @dataclass

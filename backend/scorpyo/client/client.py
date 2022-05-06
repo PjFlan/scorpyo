@@ -11,10 +11,10 @@ from scorpyo.client.handler import (
     WSHandler,
 )
 from scorpyo.engine import MatchEngine
+from scorpyo.error import EngineError, RejectReason
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
-from scorpyo.util import load_config
-
+from scorpyo.util import load_config, LOGGER
 
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
 DEFAULT_TIMEOUT = 0.5
@@ -53,7 +53,9 @@ class EngineClient:
     def handle_command(self, command: dict):
         """interpret a command and send it to the engine, registrar or otherwise"""
         if "body" not in command:
-            raise ValueError(f"missing body on incoming command" f" {command}")
+            msg = f"missing body on incoming command" f" {command}"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         self.on_event_command(command)
 
     def register_handler(self):

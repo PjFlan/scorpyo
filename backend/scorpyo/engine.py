@@ -2,6 +2,7 @@ import enum
 
 from scorpyo.context import Context
 from scorpyo.entity import EntityType
+from scorpyo.error import EngineError
 from scorpyo.match import Match, MatchState
 from scorpyo.event import (
     EventType,
@@ -54,12 +55,11 @@ class MatchEngine(Context):
             )
             return
         self._events.append(event_command)
-        event_message = self.handle_event(event_type, event_command["body"])
-        message = {
-            "event": event_type.value,
-            "message_id": self.message_id,
-            "body": event_message,
-        }
+        try:
+            event_message = self.handle_event(event_type, event_command["body"])
+        except EngineError as e:
+            event_message = e.compile(event_type)
+        message = self.create_message(event_type, event_message)
         self.message_id += 1
         self.send_message(message)
 
@@ -85,7 +85,7 @@ class MatchEngine(Context):
                 f"progress, cannot start a new match until this is "
                 f"completed"
             )
-            return EVENT_ERROR_SENTINEL
+            raise EngineError()
         start_time = util.get_current_time()
         match_type = get_match_type(payload["match_type"])
         # TODO pflanagan: this will be retrieved from persistent storage
@@ -110,7 +110,7 @@ class MatchEngine(Context):
                 "match_id from event payload {match_id} does not equal "
                 "current match_id {self.current_match.match_id}"
             )
-            return EVENT_ERROR_SENTINEL
+            raise EngineError()
         mce = MatchCompletedEvent(match_id, end_time, reason)
         self.on_match_completed(mce)
         return mce
@@ -128,6 +128,15 @@ class MatchEngine(Context):
 
     def register_client(self, client: "EngineClient"):
         self._score_listeners.append(client)
+
+    def create_message(self, event_type: EventType, message: dict):
+        message = {
+            "event": event_type.value,
+            "message_id": self.message_id,
+            "body": message,
+        }
+        self.message_id += 1
+        return message
 
 
 class EngineState(enum.Enum):

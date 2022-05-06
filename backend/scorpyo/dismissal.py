@@ -3,9 +3,10 @@ import time
 
 from scorpyo.entity import EntityType
 from scorpyo.entity import Player
+from scorpyo.error import RejectReason, EngineError
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.definitions.dismissal import get_dismissal_type, DismissalType
-from scorpyo.util import get_current_time
+from scorpyo.util import get_current_time, LOGGER
 
 
 def parse_dismissal(
@@ -18,14 +19,18 @@ def parse_dismissal(
 ):
     dt = get_dismissal_type(payload["type"])
     if not dt.bowler_accredited and "bowler" in payload:
-        raise ValueError(f"dismissal type {dt} should not specify a bowler")
+        msg = f"dismissal type {dt} should not specify a bowler"
+        LOGGER.warning(msg)
+        raise EngineError(msg, RejectReason.BAD_COMMAND)
     if not dt.batter_implied and "batter" not in payload:
-        raise ValueError(f"dismissal type {dt} must specify batter")
+        msg = f"dismissal type {dt} must specify batter"
+        LOGGER.warning(msg)
+        raise EngineError(msg, RejectReason.BAD_COMMAND)
     player_getter = functools.partial(registrar.get_entity_data, EntityType.PLAYER)
     payload_batter = player_getter(payload.get("batter"))
     fielder = player_getter(payload.get("fielder"))
     if payload_batter and payload_batter not in [off_strike, on_strike]:
-        raise ValueError(
+        raise EngineError(
             f"batter specified in dismissal {dt}: {payload_batter} is not "
             f"currently at the crease."
         )
@@ -37,15 +42,13 @@ def parse_dismissal(
         )
     if dt.needs_fielder:
         if not fielder:
-            raise ValueError(
-                f"dismissal type {dt} needs an associated fielder but "
-                f"none was specified"
-            )
+            msg = f"dismissal type {dt} needs an associated fielder but none was specified"
+            LOGGER.warn(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         if fielder not in innings.bowling_lineup:
-            raise ValueError(
-                f"fielder is not in the bowling team lineup, cannot be attributed to "
-                f"the dismissal"
-            )
+            msg = f"fielder is not in the bowling team lineup, cannot be attributed to the dismissal"
+            LOGGER.warn(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
     return Dismissal(dt, batter, bowler, fielder, get_current_time())
 
 
