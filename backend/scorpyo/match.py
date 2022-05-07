@@ -245,16 +245,19 @@ class Match(Context, Scoreable):
     def handle_team_lineup(self, payload: dict):
         home_or_away = payload.get("team")
         if not home_or_away or home_or_away not in ["home", "away"]:
-            LOGGER.warning(
+            msg = (
                 f"must specify whether team is home or away when "
                 f"registering a lineup"
             )
-            raise EngineError()
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         team_obj = {"home": self.home_lineup, "away": self.away_lineup}[home_or_away]
-        lineup = payload.get("lineup")
-        if not lineup:
-            LOGGER.warning("must provide lineup when registering a lineup")
-            raise EngineError()
+        try:
+            lineup = payload["lineup"]
+        except KeyError:
+            msg = "must provide lineup when registering a lineup"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         team_obj.add_lineup(
             self.entity_registrar.get_from_names(EntityType.PLAYER, payload["lineup"])
         )

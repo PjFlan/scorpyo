@@ -12,10 +12,9 @@ class EngineError(BaseException):
         self.msg = msg
         self.reason = reason
 
-    def compile(self, event_type: "EventType"):
+    def compile(self):
         message = {
-            "reason": self.reason.value,
-            "original_event": event_type.value,
+            "reject_reason": self.reason.value,
             "message": self.msg,
         }
         return message

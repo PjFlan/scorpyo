@@ -29,6 +29,7 @@ def test_unique_id(registrar):
 def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     test_payload = {
         "event": EventType.MATCH_STARTED,
+        "command_id": 0,
         "body": {
             "match_type": "T20",
             "home_team": HOME_TEAM,
@@ -42,11 +43,9 @@ def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
     mock_engine.current_match.handle_team_lineup(away_lineup_payload)
     assert mock_engine.current_match.max_overs() == 20
     assert mock_engine.current_match.home_team.name == HOME_TEAM
-    assert mock_engine.current_match.match_id == 0
     assert mock_engine.current_match.state == MatchState.IN_PROGRESS
     assert len(mock_engine.current_match.home_lineup) == 11
     assert len(mock_engine.current_match.away_lineup) == 11
-    MatchEngine.match_id = 0
 
 
 def test_new_innings(registrar, mock_match):

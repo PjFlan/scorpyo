@@ -2,7 +2,7 @@ import enum
 
 from scorpyo.context import Context
 from scorpyo.entity import EntityType
-from scorpyo.error import EngineError
+from scorpyo.error import EngineError, RejectReason
 from scorpyo.match import Match, MatchState
 from scorpyo.event import (
     EventType,
@@ -15,13 +15,11 @@ from scorpyo.registrar import EventRegistrar
 from scorpyo.definitions.match import get_match_type
 
 
-# TODO pflanagan: implement rollback, and pushing processed events onto a listener
-# stream. If anything goes wrong the engine should lock itself until the issue resolve
-# (but not crash). Also need to implement an API for querying the state of the match
-# for future applications like MatchReporter to consume and format
+# TODO pflanagan: implement rollback
 
 # TODO pflanagan: should each context object have some sort of validator dependency
-#  that can wrap all of the validation for a given command?
+#  that can wrap all of the validation for a given command? Otherwise I have validation
+#  scattered around - need to consolidate.
 
 
 class MatchEngine(Context):
@@ -32,11 +30,11 @@ class MatchEngine(Context):
     """
 
     event_registrar = None
-    match_id = 0
     message_id = 0
 
     def __init__(self, entity_registrar: "EntityRegistar"):
         super().__init__()
+        self.match_id = 0
         self.current_match = None
         self.state: EngineState = EngineState.LOCKED
         self._events = []
@@ -48,27 +46,44 @@ class MatchEngine(Context):
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
     def on_event(self, event_command: dict):
-        event_type = event_command.get("event")
-        if not event_type:
-            LOGGER.warning(
-                f"no event_type specified on incoming command {event_command}"
-            )
-            return
-        self._events.append(event_command)
         try:
-            event_message = self.handle_event(event_type, event_command["body"])
+            message = self.process_command(event_command)
         except EngineError as e:
-            event_message = e.compile(event_type)
-        message = self.create_message(event_type, event_message)
+            message = e.compile()
+        message["message_id"] = self.message_id
         self.message_id += 1
         self.send_message(message)
+
+    def process_command(self, command: dict):
+        try:
+            event_type = command["event"]
+            command_id = command["command_id"]
+        except KeyError:
+            msg = (
+                f"no event_type or command_id specified on incoming command"
+                f" {command}"
+            )
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
+        next_sequence = self.message_id
+        if command_id != next_sequence:
+            msg = (
+                f"command_id from client out of sequence with engine client="
+                f"{command_id}, engine={next_sequence}"
+            )
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
+        self._events.append(command)
+        resp = self.handle_event(event_type, command["body"])
+        message = self.create_message(event_type, resp)
+        return message
 
     def description(self) -> dict:
         return {"engine_user": "pflanagan"}
 
     def snapshot(self) -> dict:
         # TODO pflanagan: not sure yet what this should return, only there to conform
-        #  with Context interface
+        #  with Context interface for now
         return {}
 
     def overview(self) -> dict:
@@ -79,25 +94,35 @@ class MatchEngine(Context):
             listener.on_message(message)
 
     def handle_match_started(self, payload: dict):
+        try:
+            match_type_shortname = payload["match_type"]
+        except KeyError:
+            msg = "must specify match_type on new match command"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         if self.current_match and self.current_match.state == MatchState.IN_PROGRESS:
-            LOGGER.warning(
+            msg = (
                 f"match_id {self.current_match.match_id} is still in "
-                f"progress, cannot start a new match until this is "
-                f"completed"
+                f"progress, cannot start a new match until this is completed"
             )
-            raise EngineError()
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         start_time = util.get_current_time()
-        match_type = get_match_type(payload["match_type"])
-        # TODO pflanagan: this will be retrieved from persistent storage
-        match_id = MatchEngine.match_id
-        MatchEngine.match_id += 1
+        try:
+            match_type = get_match_type(match_type_shortname)
+        except ValueError:
+            msg = f"invalid match type: {match_type_shortname}"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         home_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, payload["home_team"]
         )
         away_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, payload["away_team"]
         )
-        mse = MatchStartedEvent(match_id, match_type, start_time, home_team, away_team)
+        mse = MatchStartedEvent(
+            self.match_id, match_type, start_time, home_team, away_team
+        )
         message = self.on_match_started(mse)
         return message
 
@@ -106,11 +131,12 @@ class MatchEngine(Context):
         match_id = payload.get("match_id")
         reason = payload.get("reason")
         if match_id != self.current_match.match_id:
-            LOGGER.warning(
+            msg = (
                 "match_id from event payload {match_id} does not equal "
                 "current match_id {self.current_match.match_id}"
             )
-            raise EngineError()
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         mce = MatchCompletedEvent(match_id, end_time, reason)
         self.on_match_completed(mce)
         return mce
@@ -132,10 +158,8 @@ class MatchEngine(Context):
     def create_message(self, event_type: EventType, message: dict):
         message = {
             "event": event_type.value,
-            "message_id": self.message_id,
             "body": message,
         }
-        self.message_id += 1
         return message
 
 
