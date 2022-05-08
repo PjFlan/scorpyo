@@ -11,7 +11,7 @@ from scorpyo.event import (
 )
 import scorpyo.util as util
 from scorpyo.util import EVENT_ERROR_SENTINEL, LOGGER
-from scorpyo.registrar import EventRegistrar
+from scorpyo.registrar import CommandRegistrar
 from scorpyo.definitions.match import get_match_type
 
 
@@ -29,29 +29,29 @@ class MatchEngine(Context):
     that other applications (client, score reporter) can listen for
     """
 
-    event_registrar = None
-    message_id = 0
-
     def __init__(self, entity_registrar: "EntityRegistar"):
         super().__init__()
         self.match_id = 0
+        self.message_id = 0
         self.current_match = None
         self.state: EngineState = EngineState.LOCKED
         self._events = []
+        self._messages = []
         self._score_listeners = []
         self.entity_registrar = entity_registrar
-        self.event_registrar = EventRegistrar()
+        self.command_registrar = CommandRegistrar()
 
         self.add_handler(EventType.MATCH_STARTED, self.handle_match_started)
         self.add_handler(EventType.MATCH_COMPLETED, self.handle_match_completed)
 
-    def on_event(self, event_command: dict):
+    def on_command(self, command: dict):
         try:
-            message = self.process_command(event_command)
+            message = self.process_command(command)
         except EngineError as e:
             message = e.compile()
         message["message_id"] = self.message_id
         self.message_id += 1
+        self._messages.append(message)
         self.send_message(message)
 
     def process_command(self, command: dict):
@@ -59,10 +59,7 @@ class MatchEngine(Context):
             event_type = command["event"]
             command_id = command["command_id"]
         except KeyError:
-            msg = (
-                f"no event_type or command_id specified on incoming command"
-                f" {command}"
-            )
+            msg = f"no event_type or command_id specified on incoming command {command}"
             LOGGER.warning(msg)
             raise EngineError(msg, RejectReason.BAD_COMMAND)
         next_sequence = self.message_id
@@ -143,7 +140,7 @@ class MatchEngine(Context):
 
     def on_match_started(self, mse: MatchStartedEvent):
         self.current_match = Match(
-            mse, self, self.entity_registrar, self.event_registrar
+            mse, self, self.entity_registrar, self.command_registrar
         )
         self._child_context = self.current_match
         return self.current_match.overview()

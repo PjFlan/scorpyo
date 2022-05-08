@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Optional, List
 
 import scorpyo.util as util
@@ -16,7 +14,7 @@ from scorpyo.event import (
     OverCompletedEvent,
     OverStartedEvent,
     InningsCompletedEvent,
-    record_event,
+    record_command,
 )
 from scorpyo.entity import EntityType
 from scorpyo.over import Over, OverState
@@ -31,13 +29,13 @@ class Innings(Context, Scoreable):
         ise: InningsStartedEvent,
         match: "Match",
         entity_registrar: "EntityRegistrar",
-        event_registrar: "EventRegistrar",
+        command_registrar: "CommandRegistrar",
     ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match = match
         self.entity_registrar = entity_registrar
-        self.event_registrar = event_registrar
+        self.command_registrar = command_registrar
         self.start_time = ise.start_time
         self.end_time = None
         self.match_innings_num = ise.match_innings_num
@@ -112,9 +110,10 @@ class Innings(Context, Scoreable):
         next_batter_index = num_down + 1
         try:
             next_batter = self.batting_lineup[next_batter_index]
-        except IndexError as e:
-            LOGGER.error("requested next batter but lineup does not contain one")
-            raise EngineError()
+        except IndexError:
+            msg = "requested next batter but lineup does not contain one"
+            LOGGER.error(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         return next_batter
 
     @property
@@ -132,7 +131,7 @@ class Innings(Context, Scoreable):
         return num_batters - num_already_batted
 
     @property
-    def active_batter_inningses(self) -> List[BatterInnings]:
+    def active_batter_inningses(self) -> List["BatterInnings"]:
         inningses = [
             i
             for i in (self.on_strike_innings, self.off_strike_innings)
@@ -174,9 +173,11 @@ class Innings(Context, Scoreable):
         }
         return output
 
-    def describe_prev_ball(self) -> dict:
+    def describe_prev_ball(self) -> Optional[dict]:
         if len(self._ball_events) == 0:
-            # TODO pflanagan: should log an error here
+            LOGGER.error(
+                "requested previous ball snapshot but there are no " "ball_events"
+            )
             return None
         prev_ball: BallCompletedEvent = self._ball_events[-1]
         prev_score: Score = prev_ball.ball_score
@@ -286,10 +287,9 @@ class Innings(Context, Scoreable):
             try:
                 player = self.next_batter
             except IndexError:
-                LOGGER.warning(
-                    "cannot process new batter innings as there are no " "players left"
-                )
-                raise EngineError()
+                msg = "cannot process new batter innings as there are no players left"
+                LOGGER.warning(msg)
+                raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         else:
             player = self.entity_registrar.get_entity_data(
                 EntityType.PLAYER, payload.get("batter")
@@ -308,16 +308,16 @@ class Innings(Context, Scoreable):
 
     def handle_over_started(self, payload: dict) -> dict:
         if "bowler" not in payload:
-            LOGGER.warning("must specify bowler of new over")
-            raise EngineError()
+            msg = "must specify bowler of new over"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         bowler = self.entity_registrar.get_entity_data(
             EntityType.PLAYER, payload["bowler"]
         )
         if bowler not in self.bowling_lineup:
-            LOGGER.warning(
-                f"bowler {bowler} does not play for team " f"{self.bowling_lineup}"
-            )
-            raise EngineError()
+            msg = f"bowler {bowler} does not play for team {self.bowling_lineup}"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         next_over_num = len(self.overs)
         max_overs_allowed = self.match.max_overs()
         if next_over_num >= max_overs_allowed:
@@ -350,15 +350,13 @@ class Innings(Context, Scoreable):
         oce = OverCompletedEvent(over_number, bowler, reason)
         return self.on_over_completed(oce)
 
-    @record_event
+    @record_command
     def on_ball_completed(self, bce: BallCompletedEvent) -> dict:
         super().update_score(bce)
         if self._dismissal_pending:
-            LOGGER.warning(
-                "received BallCompletedEvent before "
-                "BatterInningsCompleted event while dismissal is pending"
-            )
-            raise EngineError()
+            msg = "received BallCompleted before BatterInningsCompleted while dismissal pending"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         ball_increment = 1 if bce.ball_score.is_valid_delivery() else 0
         self.ball_in_match_innings_num += ball_increment
         self.ball_in_over_num += ball_increment
@@ -378,14 +376,12 @@ class Innings(Context, Scoreable):
             )
         return self.snapshot()
 
-    @record_event
+    @record_command
     def on_batter_innings_started(self, bis: BatterInningsStartedEvent) -> dict:
         if self.on_strike_innings and self.off_strike_innings:
-            LOGGER.warning(
-                "there are already two batters at the crease. Must "
-                "complete one of their innings before beginning a new one"
-            )
-            raise EngineError()
+            msg = "there are already two batters at the crease - complete one first"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         try:
             existing = find_innings(bis.batter, self.batter_inningses)
         except ValueError:
@@ -394,11 +390,12 @@ class Innings(Context, Scoreable):
             existing
             and not existing.batting_state != BatterInningsState.RETIRED_NOT_OUT
         ):
-            LOGGER.warning(
-                "batter {existing.batter} has already batted and cannot "
-                "bat again (current state {existing.batting_state})"
+            msg = (
+                f"batter {existing.batter} has already batted and cannot bat again "
+                f"(current state {existing.batting_state})"
             )
-            raise EngineError()
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         new_innings = BatterInnings(bis.batter, self, len(self.batter_inningses) + 1)
         self.batter_inningses.append(new_innings)
         if not self.on_strike_innings:
@@ -407,39 +404,39 @@ class Innings(Context, Scoreable):
             self.off_strike_innings = new_innings
         return new_innings.description()
 
-    @record_event
+    @record_command
     def on_batter_innings_completed(self, bic: BatterInningsCompletedEvent) -> dict:
         if bic.batter not in self.batting_lineup:
-            LOGGER.warning(
-                "batter {bic.batter} is not part of batting team {"
-                "self.batting_lineup}"
+            msg = (
+                f"batter {bic.batter} is not part of batting team {self.batting_lineup}"
             )
-            raise EngineError()
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         dismissed_innings = find_innings(bic.batter, self.batter_inningses)
         dismissed_innings.batting_state = bic.batting_state
         if bic.batting_state == BatterInningsState.DISMISSED:
             prev_dismissal = self.previous_ball.dismissal
             if not prev_dismissal:
-                LOGGER.warning(
-                    "inconsistent state: batter innings completed via "
-                    "dismissal but previous delivery has no associated "
-                    "dismissal"
+                msg = (
+                    "batter innings completed via dismissal ball event has no "
+                    "associated dismissal"
                 )
-                raise EngineError()
+                LOGGER.warning(msg)
+                raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
             elif prev_dismissal.batter != bic.batter:
-                LOGGER.warning(
-                    f"batter dismissed in previous ball: "
-                    f"{prev_dismissal.batter} does not equal batter "
-                    f"whose innings has just completed: {bic.batter}"
+                msg = (
+                    f"batter dismissed in previous ball: {prev_dismissal.batter} "
+                    f"does not equal batter whose innings has just completed: {bic.batter}"
                 )
-                raise EngineError()
+                LOGGER.warning(msg)
+                raise EngineError(msg, RejectReason.BAD_COMMAND)
             if dismissed_innings.batting_state != BatterInningsState.DISMISSED:
-                LOGGER.warning(
-                    "inconsistent state: batter innings completed via a"
-                    "dismissal but batter is currently in state: "
-                    "{dismissed_innings.batting_state}"
+                msg = (
+                    f"batter innings completed via a dismissal but batter is "
+                    f"currently in state: {dismissed_innings.batting_state}"
                 )
-                raise EngineError()
+                LOGGER.warning(msg)
+                raise EngineError(msg, RejectReason.INCONSISTENT_STATE)
         if dismissed_innings == self.on_strike_innings:
             self.on_strike_innings = None
         else:
@@ -447,7 +444,7 @@ class Innings(Context, Scoreable):
         self._dismissal_pending = False
         return dismissed_innings.overview()
 
-    @record_event
+    @record_command
     def on_over_completed(self, oc: OverCompletedEvent) -> dict:
         self.on_strike_innings, self.off_strike_innings = util.switch_strike(
             self.on_strike_innings, self.off_strike_innings
@@ -456,7 +453,7 @@ class Innings(Context, Scoreable):
         self.current_bowler_innings.on_over_completed(oc)
         return self.current_over.overview()
 
-    @record_event
+    @record_command
     def on_over_started(self, os: OverStartedEvent) -> dict:
         if os.bowler == self.current_bowler:
             msg = f"bowler {os.bowler} cannot bowl two overs in a row"
@@ -662,7 +659,9 @@ class BowlerInnings(Context, Scoreable):
     def on_ball_completed(self, bce: BallCompletedEvent):
         curr_over = self.current_over
         if curr_over.balls_bowled == 6 and bce.ball_score.is_valid_delivery():
-            LOGGER.warning("over has more than 6 legal deliveries")
+            msg = "over has more than 6 legal deliveries"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         super().update_score(bce)
         if bce.dismissal and bce.dismissal.bowler_accredited():
             self.wickets += 1
@@ -687,6 +686,4 @@ def find_innings(player: Player, inningses: list):
     for innings in inningses:
         if innings.player == player:
             return innings
-    msg = f"no innings found for player: {player}"
-    LOGGER.warning(msg)
-    raise ValueError(msg)
+    raise ValueError("no innings found for player: {player}")

@@ -36,7 +36,7 @@ def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
             "away_team": AWAY_TEAM,
         },
     }
-    mock_engine.on_event(test_payload)
+    mock_engine.on_command(test_payload)
     home_lineup_payload = {"team": "home", "lineup": HOME_PLAYERS}
     away_lineup_payload = {"team": "away", "lineup": AWAY_PLAYERS}
     mock_engine.current_match.handle_team_lineup(home_lineup_payload)

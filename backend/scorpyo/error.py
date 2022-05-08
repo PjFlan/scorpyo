@@ -7,7 +7,7 @@ class RejectReason(enum.Enum):
     ILLEGAL_OPERATION = "io"
 
 
-class EngineError(BaseException):
+class AbstractScorpyoError(BaseException):
     def __init__(self, msg: str, reason: RejectReason):
         self.msg = msg
         self.reason = reason
@@ -18,3 +18,13 @@ class EngineError(BaseException):
             "message": self.msg,
         }
         return message
+
+
+class ClientError(AbstractScorpyoError):
+    def __init__(self, msg: str, reason: RejectReason):
+        super().__init__(msg, reason)
+
+
+class EngineError(AbstractScorpyoError):
+    def __init__(self, msg: str, reason: RejectReason):
+        super().__init__(msg, reason)

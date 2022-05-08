@@ -95,11 +95,11 @@ class RegisterTeamLineup:
     lineup: list[Player]
 
 
-def record_event(func: callable):
+def record_command(func: callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
         obj = args[0]  # self
-        obj.event_registrar.add(args[1])
+        obj.command_registrar.add(args[1])
         return func(*args, **kwargs)
 
     return wrapper

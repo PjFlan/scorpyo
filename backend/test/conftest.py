@@ -7,7 +7,7 @@ from scorpyo.innings import find_innings, BatterInningsState, BatterInnings
 from scorpyo.match import Match
 from scorpyo.over import OverState
 from scorpyo.entity import Player
-from scorpyo.registrar import EntityType, EntityRegistrar, EventRegistrar
+from scorpyo.registrar import EntityType, EntityRegistrar, CommandRegistrar
 from scorpyo.definitions import match
 from scorpyo.entity import MatchTeam
 from .common import TEST_ENTITIES_CONFIG
@@ -21,13 +21,27 @@ test_team_home = HOME_TEAM
 test_team_away = AWAY_TEAM
 
 
+class MockEngineListener:
+
+    messages = []
+
+    def on_message(self, message: dict):
+        self.messages.append(message)
+
+
+@pytest.fixture()
+def engine_listener():
+    mock_listener = MockEngineListener()
+    return mock_listener
+
+
 # noinspection PyMissingConstructor
 class MockMatch(Match):
     def __init__(
-        self, entity_registrar: EntityRegistrar, event_registrar: EventRegistrar
+        self, entity_registrar: EntityRegistrar, command_registrar: CommandRegistrar
     ):
         self.entity_registrar = entity_registrar
-        self.event_registrar = event_registrar
+        self.command_registrar = command_registrar
         self.match_id = 12345
         self.num_innings_completed = 0
         self.match_inningses = []
@@ -98,13 +112,15 @@ def registrar():
 
 
 @pytest.fixture()
-def mock_engine(registrar):
-    return MatchEngine(registrar)
+def mock_engine(registrar, engine_listener):
+    engine = MatchEngine(registrar)
+    engine.register_client(engine_listener)
+    return engine
 
 
 @pytest.fixture()
 def mock_match(registrar):
-    mock_match = MockMatch(registrar, EventRegistrar())
+    mock_match = MockMatch(registrar, CommandRegistrar())
     teams = registrar.get_all_of_type(EntityType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]

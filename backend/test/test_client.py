@@ -1,12 +1,10 @@
 import builtins
 import json
-import time
 from io import StringIO
 from typing import List
 from unittest import TestCase
 
 import pytest
-from websocket_server import WebsocketServer
 
 from scorpyo import definitions, innings, match
 from scorpyo.client.cli_nodes import CommandLineNode, add_dismissal_triggers
@@ -22,7 +20,7 @@ from scorpyo.client.handler import (
     WSHandler,
 )
 from scorpyo.engine import MatchEngine
-from scorpyo.error import EngineError
+from scorpyo.error import EngineError, ClientError, RejectReason
 from scorpyo.registrar import EntityRegistrar
 from test.common import TEST_CONFIG_PATH
 from test.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
@@ -59,8 +57,13 @@ def mock_file():
 
 
 @pytest.fixture
-def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar):
-    my_client = EngineClient(registrar, mock_engine, TEST_CONFIG_PATH)
+def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar, monkeypatch):
+    config = {
+        "CLIENT": {"handler": "file"},
+        "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
+    }
+    monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
+    my_client = EngineClient(registrar, mock_engine, config)
     return my_client
 
 
@@ -140,10 +143,12 @@ def test_event_command_handler(mock_client, mocker):
     event_patch.assert_called_with(test_command)
 
 
-def test_command_missing_body(mock_client):
-    with pytest.raises(EngineError):
-        bad_command = {"event": "null"}
-        mock_client.handle_command(bad_command)
+def test_command_missing_body_reject(mock_client, monkeypatch, mocker):
+    on_message_patch = mocker.patch.object(FileHandler, "on_message")
+    bad_command = {"event": "null"}
+    mock_client.handle_command(bad_command)
+    args, kwargs = FileHandler.on_message.call_args
+    assert args[0]["reject_reason"] == RejectReason.BAD_COMMAND.value
 
 
 @pytest.mark.parametrize(

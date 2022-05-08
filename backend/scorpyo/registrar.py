@@ -81,7 +81,7 @@ class EntityRegistrar:
         return entities
 
 
-class EventRegistrar:
+class CommandRegistrar:
     def __init__(self):
         self._store = []
 

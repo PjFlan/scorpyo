@@ -13,7 +13,7 @@ from scorpyo.event import (
     EventType,
     InningsCompletedEvent,
     RegisterTeamLineup,
-    record_event,
+    record_command,
 )
 from scorpyo.entity import EntityType
 from scorpyo.definitions.innings import InningsState
@@ -38,13 +38,13 @@ class Match(Context, Scoreable):
         mse: MatchStartedEvent,
         match_engine: "MatchEngine",
         entity_registrar: "EntityRegistrar",
-        event_registrar: "EventRegistrar",
+        command_registrar: "CommandRegistrar",
     ):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.match_engine = match_engine
         self.entity_registrar = entity_registrar
-        self.event_registrar = event_registrar
+        self.command_registrar = command_registrar
         self.match_id = mse.match_id
         self.start_time = mse.start_time
         self.state = MatchState.IN_PROGRESS
@@ -269,15 +269,15 @@ class Match(Context, Scoreable):
         }
         return message
 
-    @record_event
+    @record_command
     def on_innings_started(self, ise: InningsStartedEvent):
-        new_innings = Innings(ise, self, self.entity_registrar, self.event_registrar)
+        new_innings = Innings(ise, self, self.entity_registrar, self.command_registrar)
         new_innings.target = self.next_innings_target
         self.add_innings(new_innings)
         self._child_context = new_innings
         return self.current_innings.description()
 
-    @record_event
+    @record_command
     def on_innings_completed(self, ice: InningsCompletedEvent):
         innings = self.current_innings
         if not innings:
