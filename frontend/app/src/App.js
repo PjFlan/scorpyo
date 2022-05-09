@@ -1,31 +1,27 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import './App.css';
+import { useScorpyo } from './useScorpyo';
 
 function App() {
 
-    useEffect(() => {
-      const ws = new WebSocket('ws://127.0.0.1:13254')
+	const {data, subscribe, send} = useScorpyo();
 
-      ws.onmessage = function (event) {
-          const json = JSON.parse(event.data);
-          try {
-              console.log(json);
-          } catch (err) {
-              console.log(err);
-          }
-      };
-  }, []);
+	const [update, setUpdate] = useState();
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <p>
-          Welcome to Scorpyo!
-        </p>
-      </header>
-    </div>
-  );
+	useEffect(() => {
+		subscribe();
+	});
+
+	useEffect(() => {
+		if (data !== undefined) {
+			setUpdate(data)
+		}
+	}, [data]);
+
+	return (
+		<div className="App">{JSON.stringify(update)}</div>
+	);
 }
 
 export default App;
