@@ -9,7 +9,7 @@ HOME_PLAYERS = [
     "Lorcan Tucker",
     "Mikey O'Reilly",
     "Ricky Ponting",
-    "Glen Maxwell",
+    "Glenn Maxwell",
     "Dean Elgar",
     "Joe Root",
     "Kane Williamson",

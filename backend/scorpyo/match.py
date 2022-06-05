@@ -119,11 +119,12 @@ class Match(Context, Scoreable):
             return None
         return self.match_inningses[computer_num]
 
-    def status(self) -> dict:
+    def snapshot(self) -> dict:
         inningses_status = []
-        output = {"match_id": self.match_id, "snapshot": self.snapshot()}
-        for innings in enumerate(self.match_inningses):
-            inningses_status.append(innings.status())
+        output = {"match_id": self.match_id}
+        output.update(self.overview())
+        for innings in self.match_inningses:
+            inningses_status.append(innings.overview())
         output["inningses"] = inningses_status
         return output
 
@@ -137,9 +138,6 @@ class Match(Context, Scoreable):
             "away_lineup": self.away_lineup(),
         }
         return output
-
-    def snapshot(self):
-        return ""
 
     def get_lineup(self, team: Team) -> Optional[MatchTeam]:
         for lineup in self.lineups:
@@ -196,10 +194,6 @@ class Match(Context, Scoreable):
         if batting_team_name is None:
             LOGGER.warning("must provide batting team when starting new innings")
             raise EngineError()
-        opening_bowler_name = payload.get("opening_bowler")
-        if opening_bowler_name is None:
-            LOGGER.warning("must provide opening bowler when starting new innings")
-            raise EngineError()
         batting_team = self.entity_registrar.get_entity_data(
             EntityType.TEAM, batting_team_name
         )
@@ -207,15 +201,6 @@ class Match(Context, Scoreable):
         bowling_lineup = [
             lineup for lineup in self.lineups if lineup != batting_lineup
         ][0]
-        opening_bowler_player = self.entity_registrar.get_entity_data(
-            EntityType.PLAYER, opening_bowler_name
-        )
-        if opening_bowler_player not in bowling_lineup:
-            LOGGER.warning(
-                f"no bowler in bowling team {bowling_lineup.name} with "
-                f"name {opening_bowler_name}"
-            )
-            raise EngineError()
         num_prev_batting_inningses = len(
             [i for i in self.match_inningses if i.batting_team == batting_team]
         )
@@ -225,7 +210,6 @@ class Match(Context, Scoreable):
             start_time,
             batting_lineup,
             bowling_lineup,
-            opening_bowler_player,
         )
         message = self.on_innings_started(ise)
         return message

@@ -20,7 +20,7 @@ from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
@@ -211,38 +211,45 @@ class CommandLineHandler(ClientHandler):
 
 
 class WSHandler(ClientHandler):
+    """Handles communication with a client over a WebSocket"""
+
     def __init__(self, config, registrar: EntityRegistrar):
         super().__init__(config, registrar)
         self.config = config["WEB_SOCKET_HANDLER"]
         self.host = self.config["host"]
         self.port = int(self.config["port"])
         self._server = None
-        logger.setLevel(logging.INFO)
-        logger.info("setting up web socket handler")
+        LOGGER.setLevel(logging.INFO)
+        LOGGER.info("setting up web socket handler")
+
+    @property
+    def num_clients(self):
+        return len(self._server.clients)
 
     def connect(self):
         self._server = self._setup_server()
         self._server.run_forever(threaded=True)
         self.on_connected()
 
+    # TODO pflanagan: exercise the client connected logic in a unit test
     def on_connected(self):
-        logger.info(f"connected to engine at {self.host}:{self.port}")
+        LOGGER.info(f"connected to engine at {self.host}:{self.port}")
         self._server.set_fn_message_received(self._on_socket_message)
 
     def is_open(self):
         return self._server is not None
 
     def close(self):
-        logger.info("web socket server shut down")
+        LOGGER.info("web socket server shut down")
         self._server.shutdown_gracefully()
         self._server = None
 
     def read(self):
-        # nothing to do as new messages are automatically queued by the socket handler
+        # new messages are automatically queued by the socket handler
         pass
 
     def on_message(self, message: dict):
-        logger.info("Sending reply from engine to clients")
+        LOGGER.info("Sending reply from engine to clients")
         self._server.send_message_to_all(json.dumps(message))
 
     def _setup_server(self) -> WebsocketServer:
@@ -250,6 +257,6 @@ class WSHandler(ClientHandler):
         return server
 
     def _on_socket_message(self, client: dict, server: WebSocketHandler, msg: str):
-        logger.info("Received message from client: " + msg)
+        LOGGER.info("Received command from client: " + msg)
         json_msg = json.loads(msg)
         self.command_buffer.append(json_msg)

@@ -4,7 +4,7 @@ from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
-from .common import TEST_ENTITIES_CONFIG
+from .common import TEST_ENTITIES_CONFIG, start_innings
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -52,9 +52,7 @@ def test_new_innings(registrar, mock_match):
     teams = registrar.get_all_of_type(EntityType.TEAM)
     mock_match.home_team = teams[0]
     mock_match.away_team = teams[1]
-    bowler_name = AWAY_PLAYERS[-1]
-    payload = {"batting_team": HOME_TEAM, "opening_bowler": bowler_name}
-    mock_match.handle_innings_started(payload)
+    start_innings(mock_match, HOME_TEAM)
     assert len(mock_match.match_inningses) == 1
     current_innings = mock_match.current_innings
     assert current_innings.match_innings_num == 0

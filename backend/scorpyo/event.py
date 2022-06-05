@@ -46,7 +46,6 @@ class InningsStartedEvent:
     start_time: float
     batting_lineup: MatchTeam
     bowling_lineup: MatchTeam
-    opening_bowler: Player
 
 
 @dataclass

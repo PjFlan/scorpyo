@@ -59,11 +59,9 @@ class Over(Context, Scoreable):
         return output
 
     def overview(self) -> dict:
-        output = {
-            "description": self.description(),
-            "snapshot": self.snapshot(),
-            "maiden": self.maiden,
-        }
+        output = self.description()
+        output.update(self.snapshot())
+        output["maiden"] = self.maiden
         return output
 
     def on_ball_completed(self, bce: "BallCompletedEvent"):

@@ -8,7 +8,7 @@ from scorpyo.over import OverState
 from scorpyo.registrar import EntityRegistrar
 from .conftest import MockMatch
 from .resources import HOME_PLAYERS
-from .common import apply_ball_events
+from .common import apply_ball_events, start_innings
 
 
 def test_ball_completed(mock_innings: Innings, registrar: EntityRegistrar):
@@ -150,24 +150,32 @@ def test_innings_completed_cleanup(
 def test_innings_numbers(mock_match: MockMatch, mock_innings: Innings, monkeypatch):
     mock_match.max_overs = lambda: 1
     mock_match.match_type = MatchType("dummy", "dmy", 2, 20, 1, 10)
-    second_innings_payload = {
-        "batting_team": mock_innings.bowling_team.name,
-        "opening_bowler": mock_innings.batting_lineup[10].name,
-    }
     ice = InningsCompletedEvent(0, None, InningsState.OVERS_COMPLETE)
     mock_match.on_innings_completed(ice)
-    mock_match.handle_innings_started(second_innings_payload)
+    start_innings(mock_match, mock_innings.bowling_team.name)
     second_innings = mock_match.current_innings
     assert second_innings.match_innings_num == 1
     assert second_innings.batting_team_innings_num == 0
     ice = InningsCompletedEvent(1, None, InningsState.OVERS_COMPLETE)
     mock_match.on_innings_completed(ice)
-    third_innings_payload = {
-        "batting_team": second_innings.bowling_team.name,
-        "opening_bowler": second_innings.batting_lineup[10].name,
-    }
-    mock_match.handle_innings_started(third_innings_payload)
+    start_innings(mock_match, second_innings.bowling_team.name)
     third_innings = mock_match.current_innings
     # pflanagan: we index all innings from 0, so 2 is actually 3
     assert third_innings.match_innings_num == 2
     assert third_innings.batting_team_innings_num == 1
+
+
+def test_innings_overview(mock_innings):
+    overview = mock_innings.overview()
+    batters = overview["batters"]
+    assert len(batters) == 11
+    # assure the fields in overview of DNB stays in sync with any updates
+    # in BatterInnings overview
+    fields = None
+    for batter in batters:
+        if not fields:
+            fields = batter.keys()
+            continue
+        new_fields = batter.keys()
+        if new_fields != fields:
+            raise AssertionError("not all batters have same overview fields")

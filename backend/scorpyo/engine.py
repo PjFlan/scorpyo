@@ -52,7 +52,10 @@ class MatchEngine(Context):
         message["message_id"] = self.message_id
         self.message_id += 1
         self._messages.append(message)
-        self.send_message(message)
+        self.send_message(message, is_snapshot=False)
+        if self.current_match:
+            snapshot_msg = self.current_match.snapshot()
+            self.send_message(snapshot_msg, is_snapshot=True)
 
     def process_command(self, command: dict):
         try:
@@ -84,9 +87,10 @@ class MatchEngine(Context):
         return {}
 
     def overview(self) -> dict:
-        return {"description": self.description(), "overview": self.overview()}
+        return {"description": self.description(), "overview": self.snapshot()}
 
-    def send_message(self, message: dict):
+    def send_message(self, message: dict, is_snapshot=False):
+        message["is_snapshot"] = is_snapshot
         for listener in self._score_listeners:
             listener.on_message(message)
 

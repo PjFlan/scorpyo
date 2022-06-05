@@ -50,7 +50,6 @@ def test_match_target_two_innings(
         None,
         prev_innings.bowling_lineup,
         prev_innings.batting_lineup,
-        prev_innings.batting_lineup[10],
     )
     mock_match.on_innings_started(ise)
     assert mock_match.get_team_runs(mock_innings.batting_team, 0) == 220

@@ -11,10 +11,11 @@ from scorpyo.client.handler import (
     WSHandler,
 )
 from scorpyo.engine import MatchEngine
-from scorpyo.error import EngineError, RejectReason, ClientError
+from scorpyo.error import RejectReason, ClientError
 from scorpyo.event import EventType
 from scorpyo.registrar import EntityRegistrar
 from scorpyo.util import load_config, LOGGER
+
 
 DEFAULT_CFG_DIR = "~/.config/scorpyo/scorpyo.cfg"
 DEFAULT_TIMEOUT = 0.5
@@ -97,18 +98,32 @@ class EngineClient:
         self.engine.on_command(command)
         self.engine_sequence += 1
 
+    def _validate_message(self, message: dict):
+        if not message["is_snapshot"]:
+            message_id = message.get("message_id")
+            if message_id is None:
+                msg = f"received message from engine with no id {message}"
+                LOGGER.error(msg)
+                raise ClientError(
+                    f"received message from engine with no id " f"{message}",
+                    RejectReason.INCONSISTENT_STATE,
+                )
+            if len(self._pending_commands) == 0:
+                msg = f"received message from engine without pending commands"
+                LOGGER.error(msg)
+                raise ClientError(msg, RejectReason.INCONSISTENT_STATE)
+            oldest_command = self._pending_commands.popleft()
+            command_id = oldest_command["command_id"]
+            if message_id != command_id:
+                msg = (
+                    f"message_id does not match command_id of oldest pending "
+                    f"command {message_id} != {command_id}"
+                )
+                LOGGER.error(msg)
+                raise ClientError(msg, RejectReason.INCONSISTENT_STATE)
+
     def on_message(self, message: dict):
-        message_id = message.get("message_id")
-        if message_id is None:
-            raise ValueError(f"received message from engine with know id {message}")
-        if len(self._pending_commands) == 0:
-            raise ValueError(f"received message from engine without pending commands")
-        oldest_command = self._pending_commands.popleft()
-        command_id = oldest_command["command_id"]
-        assert message_id == command_id, (
-            f"message_id does not match command_id of "
-            f"oldest pending command {message_id} != {command_id}"
-        )
+        self._validate_message(message)
         self._handler.on_message(message)
 
     @contextmanager

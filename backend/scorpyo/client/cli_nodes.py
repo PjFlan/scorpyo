@@ -72,15 +72,9 @@ def create_nodes():
     )
 
     # InningsStarted nodes
-    is_node_1 = CommandLineNode(
-        prompt="Opening bowler: ",
-        payload_key="opening_bowler",
-        is_entity=True,
-    )
     is_node_0 = CommandLineNode(
         prompt="Batting team: ",
         payload_key="batting_team",
-        next_nodes=[is_node_1],
         is_entity=True,
     )
 

@@ -144,7 +144,7 @@ def test_event_command_handler(mock_client, mocker):
 
 
 def test_command_missing_body_reject(mock_client, monkeypatch, mocker):
-    on_message_patch = mocker.patch.object(FileHandler, "on_message")
+    mocker.patch.object(FileHandler, "on_message")
     bad_command = {"event": "null"}
     mock_client.handle_command(bad_command)
     args, kwargs = FileHandler.on_message.call_args
@@ -195,7 +195,7 @@ def test_command_line_source(registrar, mocker, method, user_input):
         # InningsStarted
         (
             ["is", HOME_TEAM, AWAY_PLAYERS[-1]],
-            {"batting_team": HOME_TEAM, "opening_bowler": AWAY_PLAYERS[-1]},
+            {"batting_team": HOME_TEAM},
         ),
         # BallCompleted
         (["bc", "1"], {"score_text": "1"}),

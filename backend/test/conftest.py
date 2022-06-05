@@ -10,7 +10,7 @@ from scorpyo.entity import Player
 from scorpyo.registrar import EntityType, EntityRegistrar, CommandRegistrar
 from scorpyo.definitions import match
 from scorpyo.entity import MatchTeam
-from .common import TEST_ENTITIES_CONFIG
+from .common import TEST_ENTITIES_CONFIG, start_innings
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -134,8 +134,6 @@ def mock_match(registrar):
 
 
 @pytest.fixture()
-def mock_innings(mock_match: MockMatch):
-    bowler_name = test_players_away[-1]
-    payload = {"batting_team": test_team_home, "opening_bowler": bowler_name}
-    mock_match.handle_innings_started(payload)
+def mock_innings(mock_match: MockMatch, registrar: EntityRegistrar):
+    start_innings(mock_match, test_team_home)
     return mock_match.current_innings

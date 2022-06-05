@@ -5,21 +5,24 @@ from dataclasses import dataclass
 class DismissalType:
     name: str
     shortcode: str
+    scorecard: str
     bowler_accredited: bool
     batter_implied: bool
     needs_fielder: bool
 
 
-BOWLED = DismissalType("bowled", "b", True, True, False)
-CAUGHT = DismissalType("caught", "ct", True, True, True)
-LBW = DismissalType("leg before wicket", "lbw", True, True, False)
-STUMPED = DismissalType("stumped", "st", True, True, False)
-RUN_OUT = DismissalType("run out", "ro", False, False, True)
-HIT_WICKET = DismissalType("hit wicket", "hw", True, True, False)
-HIT_BALL_TWICE = DismissalType("hit twice", "ht", False, True, False)
-TIMED_OUT = DismissalType("timed out", "to", False, True, False)
-HANDLED_BALL = DismissalType("handled ball", "hb", False, False, False)
-OBSTRUCTING_FIELD = DismissalType("obstructing field", "of", False, False, False)
+BOWLED = DismissalType("bowled", "b", "b", True, True, False)
+CAUGHT = DismissalType("caught", "ct", "c", True, True, True)
+LBW = DismissalType("leg before wicket", "lbw", "lbw", True, True, False)
+STUMPED = DismissalType("stumped", "st", "st", True, True, False)
+RUN_OUT = DismissalType("run out", "ro", "run out", False, False, True)
+HIT_WICKET = DismissalType("hit wicket", "hw", "hit wicket", True, True, False)
+HIT_BALL_TWICE = DismissalType("hit twice", "ht", "hit twice", False, True, False)
+TIMED_OUT = DismissalType("timed out", "to", "timed out", False, True, False)
+HANDLED_BALL = DismissalType("handled ball", "hb", "handled ball", False, False, False)
+OBSTRUCTING_FIELD = DismissalType(
+    "obstructing field", "of", "obstruction", False, False, False
+)
 
 _dismissal_types = {
     "b": BOWLED,
