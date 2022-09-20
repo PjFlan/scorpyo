@@ -144,7 +144,6 @@ def create_nodes():
     )
 
     # BatterInningsStarted nodes
-    bis_node_1 = CommandLineNode()
     bis_node_0 = CommandLineNode(
         prompt="Batter: ",
         payload_key="batter",
@@ -227,14 +226,15 @@ def prepare_nested_payload(full_payload: dict, full_key: str) -> tuple[dict, str
     return curr_branch, payload_key
 
 
-def file_input_reader(lines: list[str]):
+def file_input_reader(lines: list[str], print_output: bool):
     lines_iter = iter(lines)
 
     def _read(prompt_str):
         response = next(lines_iter)
         while response == "":
             response = next(lines_iter)
-        print(prompt_str, response)
+        if print_output:
+            print(prompt_str, response)
         return response
 
     return _read

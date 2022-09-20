@@ -1,13 +1,17 @@
+import os
+
 from scorpyo.client.client import EngineClient
-from scorpyo.engine import MatchEngine
 from scorpyo.registrar import EntityRegistrar
-from test.common import TEST_ENTITIES_CONFIG, TEST_CONFIG_PATH
+from scorpyo.util import load_config
+
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config_ws.ini")
 
 
 def main():
-    registrar = EntityRegistrar(TEST_ENTITIES_CONFIG)
-    engine = MatchEngine(registrar)
-    client = EngineClient(registrar, engine, TEST_CONFIG_PATH)
+    config = load_config(CONFIG_PATH)
+    registrar = EntityRegistrar(config)
+    client = EngineClient(registrar, config)
     with client.connect() as client_:
         client_.process()
 

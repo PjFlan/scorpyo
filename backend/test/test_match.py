@@ -7,9 +7,7 @@ from scorpyo.definitions.match import FIRST_CLASS
 from test.conftest import MockMatch
 
 
-def test_match_target_single_innings(
-    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
-):
+def test_match_target_single_innings(mock_match: MockMatch, mock_innings: Innings):
     mock_innings._score.runs_off_bat = 220
     mock_match.num_innings_completed += 1
     new_innings = deepcopy(mock_innings)
@@ -24,9 +22,7 @@ def test_match_target_single_innings(
     assert new_innings.target_reached
 
 
-def test_match_target_two_innings(
-    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
-):
+def test_match_target_two_innings(mock_match: MockMatch, mock_innings: Innings):
     mock_match.match_type = FIRST_CLASS
     mock_innings._score.runs_off_bat = 220
     assert mock_match.target is None
@@ -56,9 +52,7 @@ def test_match_target_two_innings(
     assert mock_match.current_innings.target == 71
 
 
-def test_match_target_win_by_an_innings(
-    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
-):
+def test_match_target_win_by_an_innings(mock_match: MockMatch, mock_innings: Innings):
     mock_match.match_type = FIRST_CLASS
     mock_innings._score.runs_off_bat = 400
     assert mock_match.target is None
@@ -77,9 +71,7 @@ def test_match_target_win_by_an_innings(
     assert mock_match.next_innings_target == 0
 
 
-def test_match_target_follow_on(
-    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
-):
+def test_match_target_follow_on(mock_match: MockMatch, mock_innings: Innings):
     mock_match.match_type = FIRST_CLASS
     mock_innings._score.runs_off_bat = 400
     assert mock_match.target is None

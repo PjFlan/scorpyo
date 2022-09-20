@@ -11,7 +11,7 @@ from .resources import HOME_PLAYERS
 from .common import apply_ball_events, start_innings
 
 
-def test_ball_completed(mock_innings: Innings, registrar: EntityRegistrar):
+def test_ball_completed(mock_innings: Innings):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     mock_innings.handle_ball_completed(payload)
@@ -21,7 +21,7 @@ def test_ball_completed(mock_innings: Innings, registrar: EntityRegistrar):
     assert mock_innings.on_strike_innings.runs_scored == 0
 
 
-def test_strike_rotates(mock_innings: Innings, registrar: EntityRegistrar):
+def test_strike_rotates(mock_innings: Innings):
     payload = {"score_text": "1"}
     assert mock_innings.striker == HOME_PLAYERS[0]
     mock_innings.handle_ball_completed(payload)
@@ -41,15 +41,15 @@ def test_strike_rotates(mock_innings: Innings, registrar: EntityRegistrar):
     assert mock_innings.striker == expected_on_strike
 
 
-def test_multiple_deliveries(mock_innings: Innings, registrar: EntityRegistrar):
+def test_multiple_deliveries(mock_innings: Innings):
     payloads = [{"score_text": "1"}, {"score_text": "2"}, {"score_text": "."}]
-    apply_ball_events(payloads, registrar, mock_innings)
+    apply_ball_events(payloads, mock_innings)
     assert mock_innings.off_strike_innings.runs_scored == 1
     assert mock_innings.on_strike_innings.runs_scored == 2
-    assert mock_innings.bowler_innings._score.runs_against_bowler == 3
+    assert mock_innings.current_bowler_innings._score.runs_against_bowler == 3
 
 
-def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):
+def test_balls_faced_bowled(mock_innings: Innings):
     payloads = [
         {"score_text": "1"},
         {"score_text": "2"},
@@ -57,15 +57,13 @@ def test_balls_faced_bowled(mock_innings: Innings, registrar: EntityRegistrar):
         {"score_text": "2lb"},
         {"score_text": "2w"},
     ]
-    apply_ball_events(payloads, registrar, mock_innings)
+    apply_ball_events(payloads, mock_innings)
     assert mock_innings.on_strike_innings.balls_faced == 2
     assert mock_innings.off_strike_innings.balls_faced == 2
-    assert mock_innings.bowler_innings.balls_bowled == 4
+    assert mock_innings.current_bowler_innings.balls_bowled == 4
 
 
-def test_innings_completed_all_out(
-    mock_match: MockMatch, mock_innings: Innings, registrar: EntityRegistrar
-):
+def test_innings_completed_all_out(mock_match: MockMatch, mock_innings: Innings):
     new_batter = mock_match.apply_wickets(8)
     batters_at_crease = [mock_innings.non_striker.name, new_batter]
     expected_ytb = [mock_innings.batting_lineup[-1]]
@@ -125,9 +123,7 @@ def test_innings_completed_target_reached(mock_match: MockMatch, mock_innings: I
     assert mock_innings.state == InningsState.TARGET_REACHED
 
 
-def test_innings_completed_cleanup(
-    mock_innings: Innings, mock_match: MockMatch, registrar: EntityRegistrar
-):
+def test_innings_completed_cleanup(mock_innings: Innings, mock_match: MockMatch):
     mock_match.apply_wickets(9)
     payloads = [
         {"score_text": "1"},
@@ -136,7 +132,7 @@ def test_innings_completed_cleanup(
         {"score_text": "1"},
         {"score_text": "1"},
     ]
-    apply_ball_events(payloads, registrar, mock_innings)
+    apply_ball_events(payloads, mock_innings)
     off_strike_innings = mock_innings.off_strike_innings
     mock_match.end_batter_innings(mock_innings.on_strike_innings)
     innings_complete_payload = {

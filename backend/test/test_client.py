@@ -1,5 +1,6 @@
 import builtins
 import json
+from configparser import ConfigParser
 from io import StringIO
 from typing import List
 from unittest import TestCase
@@ -19,10 +20,7 @@ from scorpyo.client.handler import (
     check_triggers,
     WSHandler,
 )
-from scorpyo.engine import MatchEngine
-from scorpyo.error import EngineError, ClientError, RejectReason
-from scorpyo.registrar import EntityRegistrar
-from test.common import TEST_CONFIG_PATH
+from scorpyo.error import RejectReason
 from test.resources import HOME_PLAYERS, AWAY_PLAYERS, HOME_TEAM, AWAY_TEAM
 
 LINES = ["test line 1", "test line 2", "test line 3"]
@@ -57,43 +55,46 @@ def mock_file():
 
 
 @pytest.fixture
-def mock_client(mock_engine: MatchEngine, registrar: EntityRegistrar, monkeypatch):
-    config = {
-        "CLIENT": {"handler": "file"},
+def mock_config():
+    config_dict = {
+        "CLIENT": {"handler": "file", "power_save_timeout": 0},
         "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
+        "ENGINE": {"HOST": "127.0.0.0", "PORT": 12345},
     }
+    config = ConfigParser()
+    config.read_dict(config_dict)
+    return config
+
+
+@pytest.fixture
+def mock_client(mock_engine, registrar, mock_config, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    my_client = EngineClient(registrar, mock_engine, config)
+    my_client = EngineClient(registrar, mock_config)
     return my_client
 
 
-def test_client_setup(mock_engine: MatchEngine, mock_file, registrar, monkeypatch):
-    config = {
-        "CLIENT": {"handler": "file"},
-        "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
-    }
+def test_client_setup(mock_engine, mock_file, registrar, mock_config, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    my_client = EngineClient(registrar, mock_engine, config)
+    my_client = EngineClient(registrar, mock_config)
     with my_client.connect() as _client:
         assert _client._handler is not None
         assert _client._handler.is_open
     assert not my_client._handler.is_open
 
 
-def test_file_source_plain_reader(registrar, mock_file, monkeypatch):
+def test_file_source_plain_reader(mock_file, mock_config, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    config = {"FILE_HANDLER": {"url": "/path/to/url", "reader": "plain"}}
-    file_source = FileHandler(config, registrar)
+    mock_config["FILE_HANDLER"]["reader"] = "plain"
+    file_source = FileHandler(mock_config)
     file_source.connect()
     mock_file.write_lines(LINES[0:2])
     file_source.read()
     assert len(file_source.command_buffer) == 2
 
 
-def test_file_source_json_reader(registrar, mock_file, monkeypatch):
+def test_file_source_json_reader(mock_file, mock_config, monkeypatch):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    config = {"FILE_HANDLER": {"url": "/path/to/url", "reader": "json"}}
-    file_source = FileHandler(config, registrar)
+    file_source = FileHandler(mock_config)
     file_source.connect()
     mock_file.write(TEST_JSON)
     file_source.read()
@@ -105,12 +106,11 @@ def test_file_source_json_reader(registrar, mock_file, monkeypatch):
     file_source.close()
 
 
-def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
-    config = {
-        "CLIENT": {"handler": "file", "power_save_timeout": "0"},
-        "FILE_HANDLER": {"url": "/path/to/url", "reader": "plain"},
-    }
-    mock_client = EngineClient(registrar, mock_engine, config)
+def test_client_plain_reader(
+    mock_file, mocker, registrar, mock_engine, mock_config, monkeypatch
+):
+    mock_config["FILE_HANDLER"]["reader"] = "plain"
+    mock_client = EngineClient(registrar, mock_config)
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
     mock_file.write_lines(LINES)
     patched = mocker.patch.object(EngineClient, "handle_command")
@@ -120,13 +120,11 @@ def test_client_plain_reader(mock_file, mocker, registrar, mock_engine, monkeypa
     assert not mock_client._handler.has_data
 
 
-def test_client_json_reader(mock_file, mocker, registrar, mock_engine, monkeypatch):
+def test_client_json_reader(
+    mock_file, mocker, registrar, mock_engine, mock_config, monkeypatch
+):
     monkeypatch.setattr(builtins, "open", lambda x, y: mock_file)
-    config = {
-        "CLIENT": {"handler": "file", "power_save_timeout": "0"},
-        "FILE_HANDLER": {"url": "/path/to/url", "reader": "json"},
-    }
-    mock_client = EngineClient(registrar, mock_engine, config)
+    mock_client = EngineClient(registrar, mock_config)
     mock_client._handler.reader = json_reader
     mock_file.write(TEST_JSON)
     patched = mocker.patch.object(EngineClient, "handle_command")
@@ -173,7 +171,9 @@ def test_node_handler(node, user_input, output):
     ],
 )
 def test_command_line_source(registrar, mocker, method, user_input):
-    source = CommandLineHandler({"COMMAND_LINE_HANDLER": {}}, registrar)
+    config = ConfigParser()
+    config["COMMAND_LINE_HANDLER"] = {}
+    source = CommandLineHandler(config)
     patcher = mocker.patch.object(CommandLineHandler, method)
     mock_input = mocker.Mock()
     mock_input.side_effect = [user_input]
@@ -240,7 +240,9 @@ def test_command_line_source(registrar, mocker, method, user_input):
 def test_command_line_source(
     registrar, mocker, user_inputs, expected_command, monkeypatch
 ):
-    source = CommandLineHandler({"COMMAND_LINE_HANDLER": {}}, registrar)
+    config = ConfigParser()
+    config.read_dict({"COMMAND_LINE_HANDLER": {}})
+    source = CommandLineHandler(config)
     mock_input = mocker.Mock()
     mock_input.side_effect = user_inputs
     monkeypatch.setattr(source, "input_reader", mock_input)
@@ -287,7 +289,7 @@ def test_ball_completed_dismissal_triggers(user_input, node_name, expected_trigg
     assert active_triggers == expected_triggers
 
 
-def test_ws_handler_connect(mock_file, mocker, registrar, mock_engine, monkeypatch):
+def test_ws_handler_connect(mock_file, mocker, mock_engine, monkeypatch):
     config = {
         "CLIENT": {"handler": "ws"},
         "WEB_SOCKET_HANDLER": {"host": "127.0.0.1", "port": "13254"},
@@ -295,7 +297,7 @@ def test_ws_handler_connect(mock_file, mocker, registrar, mock_engine, monkeypat
     mock_server = mocker.Mock()
     monkeypatch.setattr(WSHandler, "_setup_server", lambda *x, **y: mock_server)
     run_patcher = mocker.patch.object(mock_server, "run_forever")
-    ws_handler = WSHandler(config, registrar)
+    ws_handler = WSHandler(config)
     assert ws_handler._server is None
     ws_handler.connect()
     assert ws_handler._server is not None
@@ -303,7 +305,7 @@ def test_ws_handler_connect(mock_file, mocker, registrar, mock_engine, monkeypat
     run_patcher.assert_called_once()
 
 
-def test_ws_handler_close(mock_file, mocker, registrar, mock_engine, monkeypatch):
+def test_ws_handler_close(mock_file, mocker, mock_engine, monkeypatch):
     config = {
         "CLIENT": {"handler": "ws"},
         "WEB_SOCKET_HANDLER": {"host": "127.0.0.1", "port": "13254"},
@@ -311,7 +313,7 @@ def test_ws_handler_close(mock_file, mocker, registrar, mock_engine, monkeypatch
     mock_server = mocker.Mock()
     monkeypatch.setattr(WSHandler, "_setup_server", lambda *x, **y: mock_server)
     close_patcher = mocker.patch.object(mock_server, "shutdown_gracefully")
-    ws_handler = WSHandler(config, registrar)
+    ws_handler = WSHandler(config)
     assert ws_handler._server is None
     ws_handler.connect()
     assert ws_handler._server is not None

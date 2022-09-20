@@ -1,19 +1,23 @@
-import itertools
-
 from scorpyo.engine import MatchEngine
 from scorpyo.event import EventType
 from scorpyo.match import MatchState
 from scorpyo.registrar import EntityRegistrar, EntityType
-from .common import TEST_ENTITIES_CONFIG, start_innings
+from scorpyo.util import load_config
+from .common import start_innings, TEST_CONFIG_PATH
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
 def test_registrar():
-    registrar = EntityRegistrar(TEST_ENTITIES_CONFIG)
+    config = load_config(TEST_CONFIG_PATH)
+    registrar = EntityRegistrar(config)
     assert len(registrar.get_all_of_type(EntityType.PLAYER)) > 0
     assert len(registrar.get_all_of_type(EntityType.TEAM)) > 0
     player = registrar.get_entity_data(EntityType.PLAYER, HOME_PLAYERS[0])
     assert player.name == HOME_PLAYERS[0]
+    player = registrar.get_entity_data(EntityType.PLAYER, 0)
+    assert player.name == HOME_PLAYERS[0]
+    player = registrar.get_entity_data(EntityType.PLAYER, 1)
+    assert player.name == HOME_PLAYERS[1]
 
 
 def test_unique_id(registrar):
@@ -26,7 +30,7 @@ def test_unique_id(registrar):
         assert len(all_ids) == num_items
 
 
-def test_new_match(mock_engine: "MatchEngine", registrar: EntityRegistrar):
+def test_new_match(mock_engine: "MatchEngine"):
     test_payload = {
         "event": EventType.MATCH_STARTED,
         "command_id": 0,

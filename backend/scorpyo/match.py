@@ -2,7 +2,7 @@ from typing import Optional, List
 
 import scorpyo.util as util
 from scorpyo.error import RejectReason, EngineError
-from scorpyo.util import LOGGER, EVENT_ERROR_SENTINEL
+from scorpyo.util import LOGGER
 from scorpyo.context import Context
 from scorpyo.event import (
     BallCompletedEvent,
@@ -180,16 +180,13 @@ class Match(Context, Scoreable):
             self.current_innings
             and self.current_innings.state == InningsState.IN_PROGRESS
         ):
-            LOGGER.warning(
-                "cannot start an innings while another one is still in progress."
-            )
-            raise EngineError()
+            msg = "cannot start an innings while another one is still in progress."
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         if not self.home_lineup or not self.away_lineup:
-            LOGGER.warning(
-                "cannot start an innings without first defining the "
-                "lineups of each team"
-            )
-            raise EngineError()
+            msg = "cannot start an innings without first defining the lineups of each team"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         batting_team_name = payload.get("batting_team")
         if batting_team_name is None:
             LOGGER.warning("must provide batting team when starting new innings")

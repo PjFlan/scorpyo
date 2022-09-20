@@ -1,3 +1,4 @@
+import configparser
 from copy import deepcopy
 
 import pytest
@@ -10,7 +11,8 @@ from scorpyo.entity import Player
 from scorpyo.registrar import EntityType, EntityRegistrar, CommandRegistrar
 from scorpyo.definitions import match
 from scorpyo.entity import MatchTeam
-from .common import TEST_ENTITIES_CONFIG, start_innings
+from scorpyo.util import load_config
+from .common import TEST_CONFIG_PATH, start_innings
 from .resources import HOME_TEAM, AWAY_TEAM, HOME_PLAYERS, AWAY_PLAYERS
 
 
@@ -105,9 +107,9 @@ class MockMatch(Match):
         innings_to_end.on_strike_innings = None
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def registrar():
-    ent_registrar = EntityRegistrar(TEST_ENTITIES_CONFIG)
+    ent_registrar = EntityRegistrar(TEST_CONFIG_PATH)
     return ent_registrar
 
 
@@ -134,6 +136,6 @@ def mock_match(registrar):
 
 
 @pytest.fixture()
-def mock_innings(mock_match: MockMatch, registrar: EntityRegistrar):
+def mock_innings(mock_match: MockMatch):
     start_innings(mock_match, test_team_home)
     return mock_match.current_innings

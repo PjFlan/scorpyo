@@ -3,17 +3,19 @@ import os
 from collections import defaultdict
 from typing import Optional
 
+from scorpyo import util
 from scorpyo.entity import EntityType, Entity
 from scorpyo.entity import Player
 from scorpyo.entity import Team
 
 
 class FileLoaderVisitor:
-    def __init__(self, entity_config: dict):
-        self.source_dir = entity_config["source"]
+    def __init__(self, config: dict):
+        root_dir = config["MAIN"]["root_dir"]
+        self.entities_dir = os.path.join(root_dir, "entities")
 
     def visit_player(self) -> list[Player]:
-        file_source = os.path.join(self.source_dir, "player.csv")
+        file_source = os.path.join(self.entities_dir, "player.csv")
         players = []
         with open(file_source, newline="") as fh:
             reader = csv.reader(fh)
@@ -26,7 +28,7 @@ class FileLoaderVisitor:
         return players
 
     def visit_team(self) -> list[Team]:
-        file_source = os.path.join(self.source_dir, "team.csv")
+        file_source = os.path.join(self.entities_dir, "team.csv")
         teams = []
         with open(file_source, newline="") as fh:
             reader = csv.reader(fh)
@@ -40,14 +42,14 @@ class FileLoaderVisitor:
 
 
 class EntityRegistrar:
-    def __init__(self, entities_config: dict):
-        self.config = entities_config
+    def __init__(self, config_path: Optional[str] = None):
+        self.config = util.load_config(config_path)
         self._store = defaultdict(list)
         self._id_counter = 0
         self.load_entities()
 
     def load_entities(self):
-        loader_klass = {"file": FileLoaderVisitor}[self.config["loader"]]
+        loader_klass = {"file": FileLoaderVisitor}[self.config["ENTITIES"]["loader"]]
         loader_visitor = loader_klass(self.config)
         for entity in EntityType:
             func_name = f"visit_{entity.name.lower()}"

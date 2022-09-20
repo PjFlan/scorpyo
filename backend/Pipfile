@@ -8,6 +8,9 @@ pytest = "*"
 black = "*"
 websocket-server = "*"
 websocket-client = "*"
+mocker = "*"
+fastapi = "*"
+pydantic = "*"
 
 [dev-packages]
 

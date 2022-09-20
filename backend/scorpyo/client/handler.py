@@ -28,12 +28,11 @@ class ClientHandler(abc.ABC):
     """Mostly a wrapper around various sources of match commands (files, command line,
     web, database etc.)"""
 
-    def __init__(self, config: dict, registrar: EntityRegistrar):
+    def __init__(self, config: dict):
         try:
-            self.root_dir = config["CLIENT"]["root_dir"]
+            self.root_dir = config["MAIN"]["root_dir"]
         except KeyError:
             self.root_dir = "../"
-        self.registrar = registrar
         self.is_connected = False
         self.command_buffer: deque = deque()
 
@@ -72,8 +71,8 @@ class ClientHandler(abc.ABC):
 
 
 class FileHandler(ClientHandler):
-    def __init__(self, config: dict, registrar: EntityRegistrar):
-        super().__init__(config, registrar)
+    def __init__(self, config: dict):
+        super().__init__(config)
         self.config = config["FILE_HANDLER"]
         self.url: str = os.path.join(self.root_dir, self.config["url"])
         self.reader_func = {"json": json_reader, "plain": plain_reader}[
@@ -104,13 +103,14 @@ class FileHandler(ClientHandler):
 
 
 class CommandLineHandler(ClientHandler):
-    def __init__(self, config, registrar: EntityRegistrar):
-        super().__init__(config, registrar)
+    def __init__(self, config):
+        super().__init__(config)
         self.config = config["COMMAND_LINE_HANDLER"]
         self.active = True
         self.event_nodes = create_nodes()
         self.starting_nodes_map = get_starting_event_nodes(self.event_nodes)
         self.input_reader = input
+        self.print_output = self.config.getboolean("print_output", fallback=False)
 
     @property
     def is_open(self):
@@ -121,13 +121,13 @@ class CommandLineHandler(ClientHandler):
         self.on_connected()
 
     def on_connected(self):
-        if self.config["use_file"]:
+        if self.config.getboolean("use_file", fallback=False):
             file_source = os.path.join(self.root_dir, self.config["input_source"])
             with open(file_source) as fh:
                 lines = [x.strip() for x in fh]
-            self.input_reader = file_input_reader(lines)
+            self.input_reader = file_input_reader(lines, self.print_output)
         print(
-            "\nWelcome to the scorpyo CLI. Type 'help' for a list of valid "
+            "\nWelcome to the ScorPyo CLI. Type 'help' for a list of valid "
             "instructions, or 'quit' to exit."
         )
 
@@ -167,7 +167,8 @@ class CommandLineHandler(ClientHandler):
                 continue
             if node.is_list:
                 input_value = []
-                print(node.prompt)
+                if self.print_output:
+                    print(node.prompt)
                 raw_val = self.input_reader("> ")
                 while raw_val != "F":
                     value = process_node_input(node, raw_val)
@@ -194,7 +195,8 @@ class CommandLineHandler(ClientHandler):
         self.command_buffer.append(command)
 
     def on_message(self, message: dict):
-        print(json.dumps(message, indent=4))
+        if self.print_output:
+            print(json.dumps(message, indent=4))
 
     def show_help(self):
         print(
@@ -206,15 +208,15 @@ class CommandLineHandler(ClientHandler):
             print(f"{event.value}={event.name}")
 
     def show_entities(self, entity_type: EntityType):
-        for ent in self.registrar.get_all_of_type(entity_type):
-            print(f"{ent.unique_id} - {ent.name}")
+        """TODO pflanagan: find a way to get the registrar here"""
+        pass
 
 
 class WSHandler(ClientHandler):
     """Handles communication with a client over a WebSocket"""
 
-    def __init__(self, config, registrar: EntityRegistrar):
-        super().__init__(config, registrar)
+    def __init__(self, config):
+        super().__init__(config)
         self.config = config["WEB_SOCKET_HANDLER"]
         self.host = self.config["host"]
         self.port = int(self.config["port"])

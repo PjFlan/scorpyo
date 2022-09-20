@@ -1,20 +1,27 @@
 import logging
 import time
 
-import configparser
-
+from configparser import ConfigParser
+from typing import Optional
 
 LOGGER = logging.getLogger("scorpyo")
+DEFAULT_CONFIG_DIR = "/Users/padraicflanagan/.config/scorpyo/scorpyo.ini"
+
+
 logging.basicConfig(level=logging.INFO)
 
 
-EVENT_ERROR_SENTINEL = "EVENT_ERROR"
-
-
-def load_config(config_file):
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    return config
+def load_config(config_source: Optional[str] = None):
+    if not config_source:
+        config_source = DEFAULT_CONFIG_DIR
+    if isinstance(config_source, str):
+        config = ConfigParser()
+        config.read(config_source)
+        return config
+    elif isinstance(config_source, ConfigParser):
+        return config_source
+    else:
+        raise ValueError("unknown config type passed to client: ", config_source)
 
 
 def try_int_convert(value):

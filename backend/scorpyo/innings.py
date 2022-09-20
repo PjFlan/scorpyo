@@ -51,7 +51,8 @@ class Innings(Context, Scoreable):
         self.overs = []
         self.on_strike_innings = None
         self.off_strike_innings = None
-        self.bowler_inningses = []
+        self.current_bowler_inningses = []
+        self.current_bowler_innings = None
         self.batter_inningses = []
         self.ball_in_match_innings_num = 0
         self.ball_in_over_num = 0
@@ -94,10 +95,6 @@ class Innings(Context, Scoreable):
         return self.current_over.bowler
 
     @property
-    def current_bowler_innings(self) -> Optional["BowlerInnings"]:
-        return self.bowler_innings
-
-    @property
     def wickets_down(self) -> int:
         return self._score.wickets
 
@@ -114,11 +111,14 @@ class Innings(Context, Scoreable):
         return next_batter
 
     @property
+    def already_batted(self) -> List[Player]:
+        return [bi.player for bi in self.batter_inningses]
+
+    @property
     def yet_to_bat(self) -> List[Player]:
-        players_batted = set(bi.player for bi in self.batter_inningses)
-        all_players = set(self.batting_lineup.lineup)
-        yet_to_bat = set.difference(all_players, players_batted)
-        return list(yet_to_bat)
+        yet_to_bat = set.difference(set(self.batting_lineup), set(self.already_batted))
+        # do this rather than list() to preserve order as it is in lineup
+        return [player for player in self.batting_lineup if player in yet_to_bat]
 
     @property
     def num_batters_remaining(self) -> int:
@@ -172,9 +172,6 @@ class Innings(Context, Scoreable):
 
     def describe_prev_ball(self) -> Optional[dict]:
         if len(self._ball_events) == 0:
-            LOGGER.error(
-                "requested previous ball snapshot but there are no " "ball_events"
-            )
             return None
         prev_ball: BallCompletedEvent = self._ball_events[-1]
         prev_score: Score = prev_ball.ball_score
@@ -228,9 +225,8 @@ class Innings(Context, Scoreable):
             }
             order_num += 1
             batter_status.append(overview)
-
         bowler_status = []
-        for bowler_innings in self.bowler_inningses:
+        for bowler_innings in self.current_bowler_inningses:
             bowler_status.append(bowler_innings.overview())
         over_status = []
         for over in self.overs:
@@ -257,7 +253,7 @@ class Innings(Context, Scoreable):
         return batter_innings
 
     def get_bowler_innings(self, player: Player) -> "BowlerInnings":
-        bowler_innings = find_innings(player, self.bowler_inningses)
+        bowler_innings = find_innings(player, self.current_bowler_inningses)
         return bowler_innings
 
     def get_over_by_number(self, number: int) -> Over:
@@ -296,8 +292,9 @@ class Innings(Context, Scoreable):
         return self.on_ball_completed(bce)
 
     def handle_batter_innings_started(self, payload: dict) -> dict:
-        batter = payload.get("batter")
-        if not batter:
+        try:
+            batter = payload["batter"]
+        except KeyError:
             try:
                 player = self.next_batter
             except IndexError:
@@ -305,9 +302,11 @@ class Innings(Context, Scoreable):
                 LOGGER.warning(msg)
                 raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         else:
-            player = self.entity_registrar.get_entity_data(
-                EntityType.PLAYER, payload.get("batter")
-            )
+            player = self.entity_registrar.get_entity_data(EntityType.PLAYER, batter)
+        if player in self.already_batted:
+            msg = "batter has already batted"
+            LOGGER.warning(msg)
+            raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
         bis = BatterInningsStartedEvent(player)
         return self.on_batter_innings_started(bis)
 
@@ -385,7 +384,7 @@ class Innings(Context, Scoreable):
             )
             dismissed_innings.on_dismissal(bce.dismissal)
             self._dismissal_pending = True
-        self.bowler_innings.on_ball_completed(bce)
+        self.current_bowler_innings.on_ball_completed(bce)
         self.current_over.on_ball_completed(bce)
         if bce.players_crossed:
             self.on_strike_innings, self.off_strike_innings = util.switch_strike(
@@ -443,8 +442,7 @@ class Innings(Context, Scoreable):
             elif prev_dismissal.batter != bic.batter:
                 msg = (
                     f"batter dismissed in previous ball: {prev_dismissal.batter} "
-                    f"does not equal batter whose innings has just compl"
-                    f"eted: {bic.batter}"
+                    f"does not equal batter whose innings has just completed: {bic.batter}"
                 )
                 LOGGER.warning(msg)
                 raise EngineError(msg, RejectReason.BAD_COMMAND)
@@ -487,12 +485,12 @@ class Innings(Context, Scoreable):
         new_over = Over(os.number, os.bowler, self)
         self.overs.append(new_over)
         try:
-            bowler_innings = find_innings(os.bowler, self.bowler_inningses)
+            bowler_innings = find_innings(os.bowler, self.current_bowler_inningses)
         except ValueError:
             bowler_innings = BowlerInnings(
-                os.bowler, new_over, self, len(self.bowler_inningses) + 1
+                os.bowler, self, len(self.current_bowler_inningses) + 1
             )
-            self.bowler_inningses.append(bowler_innings)
+            self.current_bowler_inningses.append(bowler_innings)
         if bowler_innings.overs_completed == self.match.max_bowler_overs:
             msg = (
                 f"bowler {os.bowler} has already bowled their full "
@@ -500,8 +498,8 @@ class Innings(Context, Scoreable):
             )
             LOGGER.warning(msg)
             raise EngineError(msg, RejectReason.ILLEGAL_OPERATION)
-        self.bowler_innings = bowler_innings
         bowler_innings.on_over_started(os)
+        self.current_bowler_innings = bowler_innings
         return new_over.description()
 
     def terminate(self, ice: InningsCompletedEvent):
@@ -591,7 +589,7 @@ class BatterInnings(Context, Scoreable):
 
     def dismissal_description(self) -> Optional[dict]:
         if not self.dismissal:
-            return "NOT OUT"
+            return "not out"
         return self.dismissal.scorecard_format
 
     def on_dismissal(self, dismissal: Dismissal):
@@ -609,9 +607,7 @@ class BatterInnings(Context, Scoreable):
 
 
 class BowlerInnings(Context, Scoreable):
-    def __init__(
-        self, player: Player, first_over: Over, innings: Innings, order_num: int
-    ):
+    def __init__(self, player: Player, innings: Innings, order_num: int):
         Context.__init__(self)
         Scoreable.__init__(self)
         self.innings = innings

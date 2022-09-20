@@ -79,7 +79,7 @@ class MatchTeam(Sequence):
         return self._lineup[item]
 
     def __iter__(self):
-        return next(self._lineup)
+        return iter(self._lineup)
 
     def __len__(self) -> int:
         return len(self._lineup)

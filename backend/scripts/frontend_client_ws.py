@@ -6,41 +6,39 @@ import time
 import websocket
 
 from scorpyo.util import load_config
-from test.common import TEST_CONFIG_PATH
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-OUTFILE = "/Users/padraicflanagan/projects/scoring-app/backend/data/sample_msgs.json"
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config_ws.ini")
+
 
 if __name__ == "__main__":
     ws = websocket.WebSocket()
 
-    config = load_config(TEST_CONFIG_PATH)
+    config = load_config(CONFIG_FILE)
     host = config["WEB_SOCKET_HANDLER"]["host"]
     port = config["WEB_SOCKET_HANDLER"]["port"]
-    home_dir = config["CLIENT"]["root_dir"]
-    input_commands = config["WEB_SOCKET_HANDLER"]["test_commands"]
+    home_dir = config["MAIN"]["root_dir"]
+    outfile = os.path.join(home_dir, "data", "sample_msgs.json")
+    input_commands = config["WEB_SOCKET_HANDLER"]["commands"]
     commands_file = os.path.join(home_dir, input_commands)
     with open(commands_file) as fh:
         time.sleep(0)
         commands = json.loads(fh.read())
 
     ws.connect(f"ws://{host}:{port}")
-    messages = {}
-    msg_idx = 0
+    messages = []
     for command in commands:
         time.sleep(0)
         ws.send(json.dumps(command))
         resp = ws.recv()
-        messages[msg_idx] = json.loads(resp)
-        msg_idx += 1
+        messages.append(json.loads(resp))
         resp = ws.recv()
-        messages[msg_idx] = json.loads(resp)
-        msg_idx += 1
+        messages.append(json.loads(resp))
         # print(json.dumps(json.loads(resp), indent=4))
     print(messages)
     ws.close()
-    with open(OUTFILE, "w") as fh:
+    with open(outfile, "w") as fh:
         json.dump(messages, fh, indent=4)

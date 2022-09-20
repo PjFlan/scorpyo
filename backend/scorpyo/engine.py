@@ -1,4 +1,6 @@
 import enum
+import json
+import socket
 
 from scorpyo.context import Context
 from scorpyo.entity import EntityType
@@ -10,16 +12,17 @@ from scorpyo.event import (
     MatchCompletedEvent,
 )
 import scorpyo.util as util
-from scorpyo.util import EVENT_ERROR_SENTINEL, LOGGER
-from scorpyo.registrar import CommandRegistrar
+from scorpyo.util import LOGGER
+from scorpyo.registrar import CommandRegistrar, EntityRegistrar
 from scorpyo.definitions.match import get_match_type
 
+"""
+TODO pflanagan: implement rollback
 
-# TODO pflanagan: implement rollback
-
-# TODO pflanagan: should each context object have some sort of validator dependency
-#  that can wrap all of the validation for a given command? Otherwise I have validation
-#  scattered around - need to consolidate.
+TODO pflanagan: should each context object have some sort of validator dependency
+that can wrap all of the validation for a given command? Otherwise I have validation
+scattered around - need to consolidate.
+"""
 
 
 class MatchEngine(Context):
@@ -56,10 +59,11 @@ class MatchEngine(Context):
         if self.current_match:
             snapshot_msg = self.current_match.snapshot()
             self.send_message(snapshot_msg, is_snapshot=True)
+        return message
 
     def process_command(self, command: dict):
         try:
-            event_type = command["event"]
+            event_type_code = command["event"]
             command_id = command["command_id"]
         except KeyError:
             msg = f"no event_type or command_id specified on incoming command {command}"
@@ -74,6 +78,12 @@ class MatchEngine(Context):
             LOGGER.warning(msg)
             raise EngineError(msg, RejectReason.BAD_COMMAND)
         self._events.append(command)
+        try:
+            event_type = EventType(event_type_code)
+        except ValueError:
+            msg = f"invalid event type {event_type_code}"
+            LOGGER.error(msg)
+            raise EngineError(msg, RejectReason.BAD_COMMAND)
         resp = self.handle_event(event_type, command["body"])
         message = self.create_message(event_type, resp)
         return message
@@ -164,6 +174,33 @@ class MatchEngine(Context):
         return message
 
 
+def run_server():
+    config = util.load_config()
+    registrar = EntityRegistrar(config)
+    engine = MatchEngine(registrar)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((config["ENGINE"]["host"], config.getint("ENGINE", "port")))
+        s.listen()
+        while True:
+            conn, address = s.accept()
+            with conn:
+                print(f"Connected by {address}")
+                full_message = ""
+                while True:
+                    data = conn.recv(1024)
+                    if not data:
+                        break
+                    full_message += data.decode()
+                    json_command = json.loads(full_message)
+                    resp = engine.on_command(json_command)
+                    resp_str = json.dumps(resp)
+                    conn.sendall(resp_str.encode())
+
+
 class EngineState(enum.Enum):
     LOCKED = 0
     RUNNING = 1
+
+
+if __name__ == "__main__":
+    run_server()
